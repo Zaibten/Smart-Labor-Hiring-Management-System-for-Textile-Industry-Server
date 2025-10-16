@@ -106,45 +106,35 @@ app.post("/transcribe", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "کوئی فائل اپلوڈ نہیں ہوئی" });
 
-    const originalBuffer = req.file.buffer;
-    const convertedPath = `/tmp/${Date.now()}.mp3`; // temp path allowed on serverless
-
-    // Convert buffer to mp3 using ffmpeg
-    await new Promise((resolve, reject) => {
-      ffmpeg()
-        .input(originalBuffer)
-        .inputFormat(req.file.mimetype.split("/")[1])
-        .toFormat("mp3")
-        .on("error", reject)
-        .on("end", resolve)
-        .save(convertedPath);
-    });
-
-    const audioData = fs.readFileSync(convertedPath);
-
-    // Send to OpenAI Whisper
     const formData = new FormData();
-    formData.append("file", audioData, "audio.mp3");
+    formData.append("file", req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
     formData.append("model", "whisper-1");
 
-    const whisperResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: formData,
     });
 
-    const transcription = await whisperResponse.json();
-    const detectedText = transcription.text || "";
+    const data = await response.json();
+    if (data.error) {
+      return res.status(500).json({ error: data.error.message });
+    }
 
-    // Delete temp file
-    fs.unlinkSync(convertedPath);
-
-    res.json({ text: detectedText });
+    res.json({ text: data.text });
   } catch (err) {
     console.error("Transcription error:", err);
     res.status(500).json({ error: "آڈیو کو ٹیکسٹ میں تبدیل کرنے میں ناکامی" });
   }
 });
+
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+});
+
 
 
 
