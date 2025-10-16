@@ -294,7 +294,39 @@ const questionsData = [
     { "id": 28, "text": "میں نئی جگہ پر کیسے کام تلاش کروں؟", "response": "نئی جگہ پر کام تلاش کرنے کے لیے 'Jobs' سیکشن میں فلٹرز کے ذریعے مقام منتخب کریں۔" },
     { "id": 29, "text": "میں کام کے اوقات کیسے دیکھ سکتا ہوں؟", "response": "کام کے اوقات دیکھنے کے لیے 'Work Schedule' یا 'Shifts' سیکشن کھولیں۔" },
     { "id": 30, "text": "میں کس طرح اپنے کام کی درجہ بندی بڑھا سکتا ہوں؟", "response": "کام کی درجہ بندی بڑھانے کے لیے اچھا کام کریں، ریویوز حاصل کریں اور 'Ratings' اپ ڈیٹ کریں۔" }
+,
+  { "id": 31, "text": "ایپ کو کیسے چلائیں؟", "response": "ایپ کو چلانے کے لیے اسے انسٹال کریں، لاگ ان کریں اور مین مینو سے اپنے فیچرز استعمال کریں۔" },
+  { "id": 32, "text": "میں اپنا پاسورڈ کیسے بدل سکتا ہوں؟", "response": "پاسورڈ بدلنے کے لیے 'Settings' > 'Change Password' میں جائیں۔" },
+  { "id": 33, "text": "میں ایپ میں نوٹیفکیشن کیسے آن کروں؟", "response": "نوٹیفکیشن آن کرنے کے لیے 'Settings' > 'Notifications' میں جائیں اور مطلوبہ آپشن آن کریں۔" },
+  { "id": 34, "text": "میں ایپ میں نئی نوکری کیسے دیکھوں؟", "response": "نئی نوکری دیکھنے کے لیے 'Jobs' سیکشن کھولیں اور فلٹرز استعمال کریں۔" },
+  { "id": 35, "text": "میں ایپ میں اپنی پروفائل اپ ڈیٹ کیسے کروں؟", "response": "پروفائل اپ ڈیٹ کرنے کے لیے 'Profile' > 'Edit' میں جائیں اور معلومات بدلیں۔" },
+  { "id": 36, "text": "میں ایپ پر اپنے کام کی رپورٹ کیسے دیکھوں؟", "response": "کام کی رپورٹ دیکھنے کے لیے 'Work History' یا 'Attendance' سیکشن استعمال کریں۔" },
+  { "id": 37, "text": "میں ایپ میں کسی ٹھیکیدار سے کیسے رابطہ کروں؟", "response": "ٹھیکیدار سے رابطہ کرنے کے لیے 'Contractors' > 'Contact' استعمال کریں۔" },
+  { "id": 38, "text": "میں ایپ پر نوکری چھوڑنے کا طریقہ کیا ہے؟", "response": "نوکری چھوڑنے کے لیے 'Jobs' میں جائیں اور 'Resign' پر کلک کریں۔" },
+  { "id": 39, "text": "میں ایپ میں اپنی دستیابی کیسے سیٹ کروں؟", "response": "دستیابی سیٹ کرنے کے لیے 'Availability' سیکشن میں جائیں اور تاریخ یا وقت منتخب کریں۔" },
+  { "id": 40, "text": "میں ایپ پر تنخواہ کیسے دیکھوں؟", "response": "تنخواہ دیکھنے کے لیے 'Salary' سیکشن کھولیں اور اپنے شیڈول کے مطابق معلومات دیکھیں۔" },
+  { "id": 41, "text": "میں ایپ میں نئی مہارتیں کیسے سیکھ سکتا ہوں؟", "response": "نئی مہارتیں سیکھنے کے لیے 'Skills' یا 'Learning' سیکشن میں دستیاب کورسز دیکھیں۔" },
+  { "id": 42, "text": "میں ایپ پر کام کے اوقات کیسے دیکھوں؟", "response": "کام کے اوقات دیکھنے کے لیے 'Work Schedule' یا 'Shifts' سیکشن استعمال کریں۔" },
+  { "id": 43, "text": "میں ایپ پر ادائیگی کے طریقے کیسے بدلوں؟", "response": "ادائیگی کے طریقے بدلنے کے لیے 'Settings' > 'Payment Methods' میں جائیں اور نیا طریقہ منتخب کریں۔" },
+  { "id": 44, "text": "میں ایپ میں ریٹنگ کیسے بڑھاؤں؟", "response": "ریٹنگ بڑھانے کے لیے اچھا کام کریں اور کلائنٹس سے مثبت ریویوز حاصل کریں۔" },
+  { "id": 45, "text": "میں ایپ پر شکایت کیسے دوں؟", "response": "شکایت دینے کے لیے 'Support' > 'Report Issue' استعمال کریں۔" },
+  { "id": 46, "text": "میں ایپ میں کسی دوست کو کیسے مدعو کروں؟", "response": "دوست کو مدعو کرنے کے لیے 'Invite Friends' آپشن استعمال کریں۔" },
+  { "id": 47, "text": "میں ایپ میں پرانے کام کی ریکارڈ کیسے دیکھوں؟", "response": "پرانے کام دیکھنے کے لیے 'Work History' یا 'Jobs Completed' سیکشن کھولیں۔" },
+  { "id": 48, "text": "میں ایپ میں اپ لوڈ کی گئی تصویریں کیسے دیکھوں؟", "response": "تصویریں دیکھنے کے لیے 'Profile' > 'Gallery' میں جائیں۔" },
+  { "id": 49, "text": "میں ایپ میں ڈیجیٹل معاہدہ کیسے دیکھوں؟", "response": "ڈیجیٹل معاہدہ دیکھنے کے لیے 'Contracts' سیکشن میں جائیں اور متعلقہ معاہدہ کھولیں۔" },
+  { "id": 50, "text": "میں ایپ میں کس طرح ایمرجنسی مدد لے سکتا ہوں؟", "response": "ایمرجنسی مدد کے لیے 'Support' > 'Emergency' استعمال کریں اور فوری رابطہ کریں۔" },
+  { "id": 51, "text": "میں ایپ میں نوکری کی درخواست کب تک رکھ سکتا ہوں؟", "response": "نوکری کی درخواست 'Jobs' میں جا کر منتخب کریں اور 'Apply' پر کلک کریں۔" },
+  { "id": 52, "text": "میں ایپ میں کیسے سائن آؤٹ کروں؟", "response": "سائن آؤٹ کرنے کے لیے 'Settings' > 'Logout' پر کلک کریں۔" },
+  { "id": 53, "text": "میں ایپ میں نوٹیفکیشن بند کیسے کروں؟", "response": "نوٹیفکیشن بند کرنے کے لیے 'Settings' > 'Notifications' میں جائیں اور آف کریں۔" },
+  { "id": 54, "text": "میں ایپ میں پروفائل فوٹو کیسے بدلوں؟", "response": "پروفائل فوٹو بدلنے کے لیے 'Profile' > 'Edit' > 'Upload Photo' استعمال کریں۔" },
+  { "id": 55, "text": "میں ایپ میں کام کی تفصیلات کیسے دیکھوں؟", "response": "کام کی تفصیلات دیکھنے کے لیے 'Jobs' یا 'Work History' میں جائیں۔" },
+  { "id": 56, "text": "میں ایپ میں دستیاب جابز کیسے فلٹر کروں؟", "response": "جابز فلٹر کرنے کے لیے 'Jobs' میں فلٹرز استعمال کریں جیسے مقام، وقت یا تنخواہ۔" },
+  { "id": 57, "text": "میں ایپ میں اپنا پروفائل کیسے ایکٹیو رکھوں؟", "response": "پروفائل ایکٹیو رکھنے کے لیے تمام معلومات مکمل کریں اور 'Profile Active' آن کریں۔" },
+  { "id": 58, "text": "میں ایپ میں کسی ٹھیکیدار کی ٹیم میں شامل کیسے ہوں؟", "response": "ٹھیکیدار کی ٹیم میں شامل ہونے کے لیے 'Contractors' میں جائیں اور درخواست دیں۔" },
+  { "id": 59, "text": "میں ایپ میں نئی جگہ پر کام کیسے تلاش کروں؟", "response": "نئی جگہ پر کام تلاش کرنے کے لیے 'Jobs' سیکشن میں مقام منتخب کریں۔" },
+  { "id": 60, "text": "میں ایپ میں تربیتی کورس کیسے دیکھوں؟", "response": "تربیتی کورس دیکھنے کے لیے 'Learning' یا 'Skills' سیکشن استعمال کریں۔" }
 ];
+
 
 
 const findMatchingQuestion = (text) => {
@@ -310,7 +342,7 @@ app.post("/api/chat", async (req, res) => {
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: "Message is required" });
 
-    // Step 1: Translate user input to Urdu using OpenAI
+    // Step 1: Translate user input to Urdu
     const translation = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -321,13 +353,13 @@ app.post("/api/chat", async (req, res) => {
 
     const messageInUrdu = translation.choices[0].message.content.trim();
 
-    // Step 2: Try to find a match in predefined questions
+    // Step 2: Find exact or partial match
     const matchedQuestion = findMatchingQuestion(messageInUrdu);
     if (matchedQuestion) {
       return res.json({ reply: matchedQuestion.response });
     }
 
-    // Step 3: If no match, generate relevant Urdu answer based on predefined questions
+    // Step 3: Generate a context-aware answer in Urdu based on app features
     const context = questionsData.map(q => `سوال: ${q.text} | جواب: ${q.response}`).join("\n");
 
     const response = await openai.chat.completions.create({
@@ -335,7 +367,7 @@ app.post("/api/chat", async (req, res) => {
       messages: [
         {
           role: "system",
-          content: `آپ ایک AI اسسٹنٹ ہیں جو صرف دی گئی معلومات پر مبنی سوالات کے جواب دیتا ہے۔ ہمیشہ جواب اردو میں دیں۔ اگر سوال متعلقہ نہ ہو تو جواب نہ دیں۔ معلومات: ${context}`
+          content: `آپ ایک AI اسسٹنٹ ہیں جو صرف مزدور اور ٹھیکیدار ایپ کے اندر موجود فیچرز کی بنیاد پر سوالات کے جواب دیتے ہیں۔ ہمیشہ جواب اردو میں دیں۔ اگر سوال مکمل طور پر مختلف ہو تو اپنی سمجھ کے مطابق سب سے قریب ترین اور متعلقہ جواب دیں۔ معلومات: ${context}`
         },
         { role: "user", content: messageInUrdu }
       ],
@@ -346,9 +378,10 @@ app.post("/api/chat", async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "سرور میں خرابی پیش آگئی" });
   }
 });
+
 
 
 // Transcribe route
