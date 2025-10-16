@@ -116,7 +116,7 @@ app.post("/api/chat", async (req, res) => {
 
     // Step 1: Translate user input to Urdu
     const translation = await openai.chat.completions.create({
-       model: "gpt-3.5-turbo",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: "آپ کا کام صرف انگریزی یا کسی بھی زبان کو اردو میں ترجمہ کرنا ہے، بغیر جواب دیے۔" },
         { role: "user", content: message }
@@ -135,7 +135,7 @@ app.post("/api/chat", async (req, res) => {
     const context = questionsData.map(q => `سوال: ${q.text} | جواب: ${q.response}`).join("\n");
 
     const response = await openai.chat.completions.create({
-   model: "gpt-3.5-turbo",
+  model: "gpt-4o-mini",
   messages: [
     {
       role: "system",
