@@ -227,79 +227,62 @@
 // });
 
 
-
-const ffmpeg = require("fluent-ffmpeg");
-const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
-const fs = require("fs");
-const FormData = require("form-data");
-const fetch = require("node-fetch");
 const express = require("express");
 const multer = require("multer");
+const FormData = require("form-data");
+const fetch = require("node-fetch");
 const OpenAI = require("openai");
-const path = require("path");
+const cloudinary = require("cloudinary").v2;
 require("dotenv").config();
 
 const app = express();
-const port = 3000;
 app.use(express.json());
 
-const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-
+// ✅ Cloudinary Config
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ✅ Cloudinary Storage for audio
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "audio_uploads",
-    resource_type: "auto",
-  },
-});
-
-const upload = multer({ storage });
+// ✅ Multer with in-memory storage
+const upload = multer({ storage: multer.memoryStorage() });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// 🎧 TRANSCRIBE ROUTE with Cloudinary
+// 🎧 TRANSCRIBE ROUTE
 app.post("/transcribe", upload.single("file"), async (req, res) => {
   try {
-    if (!req.file || !req.file.path) {
+    if (!req.file) {
       return res.status(400).json({ error: "کوئی فائل اپلوڈ نہیں ہوئی" });
     }
 
-    // ✅ Step 1: Get Cloudinary URL of uploaded file
-    const cloudinaryUrl = req.file.path;
-    console.log("Cloudinary URL:", cloudinaryUrl);
-
-    // ✅ Step 2: Download audio from Cloudinary
-    const audioResponse = await fetch(cloudinaryUrl);
-    if (!audioResponse.ok) throw new Error("Failed to download file from Cloudinary");
-    const audioBuffer = await audioResponse.buffer();
-
-    // ✅ Step 3: Convert to mp3 if needed (optional)
-    // If file is already mp3, skip this part
-    const tempInput = path.join(__dirname, "temp_input_" + Date.now());
-    const tempOutput = path.join(__dirname, "temp_output_" + Date.now() + ".mp3");
-    fs.writeFileSync(tempInput, audioBuffer);
-
-    await new Promise((resolve, reject) => {
-      ffmpeg(tempInput)
-        .setFfmpegPath(ffmpegPath)
-        .output(tempOutput)
-        .on("end", resolve)
-        .on("error", reject)
-        .run();
+    // ✅ Step 1: Upload buffer to Cloudinary directly
+    const cloudinaryResult = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { resource_type: "auto", folder: "audio_uploads" },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      uploadStream.end(req.file.buffer);
     });
 
-    // ✅ Step 4: Send to Whisper API
-    const fileStream = fs.createReadStream(tempOutput);
+    const audioUrl = cloudinaryResult.secure_url;
+    console.log("Uploaded to Cloudinary:", audioUrl);
+
+    // ✅ Step 2: Download audio file from Cloudinary
+    const audioResponse = await fetch(audioUrl);
+    if (!audioResponse.ok) throw new Error("Cloudinary file fetch failed");
+    const audioBuffer = await audioResponse.buffer();
+
+    // ✅ Step 3: Send audio buffer to Whisper
     const form = new FormData();
-    form.append("file", fileStream);
+    form.append("file", audioBuffer, {
+      filename: "audio.mp3", // whisper needs a filename
+      contentType: req.file.mimetype || "audio/mpeg",
+    });
     form.append("model", "whisper-1");
 
     const whisperResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
@@ -313,19 +296,15 @@ app.post("/transcribe", upload.single("file"), async (req, res) => {
 
     const data = await whisperResponse.json();
 
-    // Cleanup temp files
-    fs.unlinkSync(tempInput);
-    fs.unlinkSync(tempOutput);
-
     if (data.error) {
       console.error("Whisper error:", data.error);
       return res.status(500).json({ error: data.error.message });
     }
 
-    // ✅ Return both text + Cloudinary URL
+    // ✅ Step 4: Return text and Cloudinary URL
     res.json({
       text: data.text || "",
-      cloudinaryUrl: cloudinaryUrl,
+      cloudinaryUrl: audioUrl,
     });
 
   } catch (err) {
@@ -334,6 +313,6 @@ app.post("/transcribe", upload.single("file"), async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
+// ✅ Vercel: Export as handler instead of listen
+module.exports = app;
+
