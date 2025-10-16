@@ -261,7 +261,7 @@ const upload = multer({ storage });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Transcribe route
-app.post("/transcribe", upload.single("file"), async (req, res) => {
+app.post("/api/transcribe", upload.single("file"), async (req, res) => {
   try {
     if (!req.file || !req.file.path) return res.status(400).json({ error: "کوئی فائل اپلوڈ نہیں ہوئی" });
 
