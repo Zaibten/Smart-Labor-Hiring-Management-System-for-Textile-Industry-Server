@@ -239,6 +239,7 @@ const FormData = require("form-data");
 const fetch = require("node-fetch"); // If you get ESM issue, use v2: npm install node-fetch@2
 const OpenAI = require("openai");
 require("dotenv").config();
+const stringSimilarity = require("string-similarity");
 
 const app = express();
 app.use(express.json());
@@ -327,47 +328,26 @@ const questionsData = [
   { "id": 60, "text": "میں ایپ میں تربیتی کورس کیسے دیکھوں؟", "response": "تربیتی کورس دیکھنے کے لیے 'Learning' یا 'Skills' سیکشن استعمال کریں۔" }
 ];
 
-const getMostSimilarQuestion = async (userText) => {
-  // Get embeddings for user question
-  const userEmbeddingRes = await openaiClient.embeddings.create({
-    model: "text-embedding-3-small",
-    input: userText,
-  });
-  const userEmbedding = userEmbeddingRes.data[0].embedding;
 
-  let bestScore = -1;
-  let bestMatch = null;
-
-  for (const q of questionsData) {
-    const qEmbeddingRes = await openaiClient.embeddings.create({
-      model: "text-embedding-3-small",
-      input: q.text,
-    });
-    const qEmbedding = qEmbeddingRes.data[0].embedding;
-
-    // Cosine similarity
-    const dot = userEmbedding.reduce((sum, val, i) => sum + val * qEmbedding[i], 0);
-    const magUser = Math.sqrt(userEmbedding.reduce((sum, val) => sum + val * val, 0));
-    const magQ = Math.sqrt(qEmbedding.reduce((sum, val) => sum + val * val, 0));
-    const similarity = dot / (magUser * magQ);
-
-    if (similarity > bestScore) {
-      bestScore = similarity;
-      bestMatch = q;
-    }
-  }
-
-  return bestMatch;
-};
 
 
 
 const findMatchingQuestion = (text) => {
   const lowerText = text.toLowerCase();
-  const match = questionsData.find(q => q.text.includes(lowerText) || lowerText.includes(q.text));
-  if (match) return match;
-  const similar = questionsData.find(q => q.text.split(" ").some(word => lowerText.includes(word)));
-  return similar;
+  let bestMatch = null;
+  let highestScore = 0;
+
+  questionsData.forEach(q => {
+    const score = stringSimilarity.compareTwoStrings(q.text.toLowerCase(), lowerText);
+    if (score > highestScore) {
+      highestScore = score;
+      bestMatch = q;
+    }
+  });
+
+  // Return if score is reasonably high
+  if (highestScore > 0.5) return bestMatch;
+  return null;
 };
 
 app.post("/api/chat", async (req, res) => {
@@ -387,25 +367,25 @@ app.post("/api/chat", async (req, res) => {
     const messageInUrdu = translation.choices[0].message.content.trim();
 
     // Step 2: Find exact or partial match
-   const matchedQuestion = await getMostSimilarQuestion(messageInUrdu);
-if (matchedQuestion) {
-  return res.json({ reply: matchedQuestion.response });
-}
-
+    const matchedQuestion = findMatchingQuestion(messageInUrdu);
+    if (matchedQuestion) {
+      return res.json({ reply: matchedQuestion.response });
+    }
 
     // Step 3: Generate a context-aware answer in Urdu based on app features
     const context = questionsData.map(q => `سوال: ${q.text} | جواب: ${q.response}`).join("\n");
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `آپ ایک AI اسسٹنٹ ہیں جو صرف مزدور اور ٹھیکیدار ایپ کے اندر موجود فیچرز کی بنیاد پر سوالات کے جواب دیتے ہیں۔ ہمیشہ جواب اردو میں دیں۔ اگر سوال مکمل طور پر مختلف ہو تو اپنی سمجھ کے مطابق سب سے قریب ترین اور متعلقہ جواب دیں۔ معلومات: ${context}`
-        },
-        { role: "user", content: messageInUrdu }
-      ],
-    });
+   const response = await openai.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [
+    {
+      role: "system",
+      content: `آپ ایک AI اسسٹنٹ ہیں جو مزدور اور ٹھیکیدار ایپ کے فیچرز پر سوالات کے جواب دیتا ہے۔ اگر سوال براہ راست دستیاب نہیں ہے، تو سب سے قریب ترین اور متعلقہ جواب دیں۔ ہمیشہ اردو میں جواب دیں۔ معلومات: ${questionsData.map(q => `${q.text}: ${q.response}`).join("\n")}`
+    },
+    { role: "user", content: messageInUrdu }
+  ],
+});
+
 
     const reply = response.choices[0].message.content;
     res.json({ reply });
