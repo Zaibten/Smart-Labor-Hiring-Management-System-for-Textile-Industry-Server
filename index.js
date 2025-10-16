@@ -11,7 +11,9 @@ require("dotenv").config();
 const app = express();
 const port = 3000;
 app.use(express.json());
-const upload = multer({ dest: "uploads/" });
+// const upload = multer({ dest: "uploads/" });
+const upload = multer({ storage: multer.memoryStorage() });
+
 
 // Predefined questions
 const questionsData = [
@@ -49,25 +51,78 @@ const questionsData = [
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// app.post("/transcribe", upload.single("file"), async (req, res) => {
+//   try {
+//     if (!req.file) return res.status(400).json({ error: "کوئی فائل اپلوڈ نہیں ہوئی" });
+
+//     const originalPath = req.file.path;
+//     const convertedPath = `${originalPath}.mp3`;
+
+//     // Convert audio to mp3
+//     await new Promise((resolve, reject) => {
+//       ffmpeg(originalPath)
+//         .toFormat("mp3")
+//         .on("error", (err) => reject(err))
+//         .on("end", () => resolve())
+//         .save(convertedPath);
+//     });
+
+//     const audioData = fs.readFileSync(convertedPath);
+
+//     // Send to Whisper API
+//     const formData = new FormData();
+//     formData.append("file", audioData, "audio.mp3");
+//     formData.append("model", "whisper-1");
+
+//     const whisperResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+//       method: "POST",
+//       headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+//       body: formData,
+//     });
+
+//     const transcription = await whisperResponse.json();
+//     const detectedText = transcription.text || "";
+
+//     // Delete files
+//     fs.unlinkSync(originalPath);
+//     fs.unlinkSync(convertedPath);
+
+//     // Return the **raw transcription**, no translation
+//     res.json({ text: detectedText });
+
+//   } catch (err) {
+//     console.error("Transcription error:", err);
+//     res.status(500).json({ error: "آڈیو کو ٹیکسٹ میں تبدیل کرنے میں ناکامی" });
+//   }
+// });
+
+
+
+
+
+// Helper to find matching question
+
 app.post("/transcribe", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "کوئی فائل اپلوڈ نہیں ہوئی" });
 
-    const originalPath = req.file.path;
-    const convertedPath = `${originalPath}.mp3`;
+    const originalBuffer = req.file.buffer;
+    const convertedPath = `/tmp/${Date.now()}.mp3`; // temp path allowed on serverless
 
-    // Convert audio to mp3
+    // Convert buffer to mp3 using ffmpeg
     await new Promise((resolve, reject) => {
-      ffmpeg(originalPath)
+      ffmpeg()
+        .input(originalBuffer)
+        .inputFormat(req.file.mimetype.split("/")[1])
         .toFormat("mp3")
-        .on("error", (err) => reject(err))
-        .on("end", () => resolve())
+        .on("error", reject)
+        .on("end", resolve)
         .save(convertedPath);
     });
 
     const audioData = fs.readFileSync(convertedPath);
 
-    // Send to Whisper API
+    // Send to OpenAI Whisper
     const formData = new FormData();
     formData.append("file", audioData, "audio.mp3");
     formData.append("model", "whisper-1");
@@ -81,13 +136,10 @@ app.post("/transcribe", upload.single("file"), async (req, res) => {
     const transcription = await whisperResponse.json();
     const detectedText = transcription.text || "";
 
-    // Delete files
-    fs.unlinkSync(originalPath);
+    // Delete temp file
     fs.unlinkSync(convertedPath);
 
-    // Return the **raw transcription**, no translation
     res.json({ text: detectedText });
-
   } catch (err) {
     console.error("Transcription error:", err);
     res.status(500).json({ error: "آڈیو کو ٹیکسٹ میں تبدیل کرنے میں ناکامی" });
@@ -97,8 +149,6 @@ app.post("/transcribe", upload.single("file"), async (req, res) => {
 
 
 
-
-// Helper to find matching question
 const findMatchingQuestion = (text) => {
   const lowerText = text.toLowerCase();
   const match = questionsData.find(q => q.text.includes(lowerText) || lowerText.includes(q.text));
