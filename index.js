@@ -239,7 +239,6 @@ const FormData = require("form-data");
 const fetch = require("node-fetch"); // If you get ESM issue, use v2: npm install node-fetch@2
 const OpenAI = require("openai");
 require("dotenv").config();
-const stringSimilarity = require("string-similarity");
 
 const app = express();
 app.use(express.json());
@@ -331,23 +330,12 @@ const questionsData = [
 
 
 
-
 const findMatchingQuestion = (text) => {
   const lowerText = text.toLowerCase();
-  let bestMatch = null;
-  let highestScore = 0;
-
-  questionsData.forEach(q => {
-    const score = stringSimilarity.compareTwoStrings(q.text.toLowerCase(), lowerText);
-    if (score > highestScore) {
-      highestScore = score;
-      bestMatch = q;
-    }
-  });
-
-  // Return if score is reasonably high
-  if (highestScore > 0.5) return bestMatch;
-  return null;
+  const match = questionsData.find(q => q.text.includes(lowerText) || lowerText.includes(q.text));
+  if (match) return match;
+  const similar = questionsData.find(q => q.text.split(" ").some(word => lowerText.includes(word)));
+  return similar;
 };
 
 app.post("/api/chat", async (req, res) => {
@@ -375,12 +363,21 @@ app.post("/api/chat", async (req, res) => {
     // Step 3: Generate a context-aware answer in Urdu based on app features
     const context = questionsData.map(q => `سوال: ${q.text} | جواب: ${q.response}`).join("\n");
 
-   const response = await openai.chat.completions.create({
+    const response = await openai.chat.completions.create({
   model: "gpt-4o-mini",
   messages: [
     {
       role: "system",
-      content: `آپ ایک AI اسسٹنٹ ہیں جو مزدور اور ٹھیکیدار ایپ کے فیچرز پر سوالات کے جواب دیتا ہے۔ اگر سوال براہ راست دستیاب نہیں ہے، تو سب سے قریب ترین اور متعلقہ جواب دیں۔ ہمیشہ اردو میں جواب دیں۔ معلومات: ${questionsData.map(q => `${q.text}: ${q.response}`).join("\n")}`
+      content: `
+آپ ایک AI اسسٹنٹ ہیں جو صرف "مزدور اور ٹھیکیدار" موبائل ایپ کے basic flow اور فیچرز کے مطابق جواب دیتا ہے۔  
+- ہمیشہ جواب اردو میں دیں۔  
+- ہر سوال کا جواب ایپ کے استعمال یا فیچرز کے تناظر میں دیں، جیسے لاگ ان، پروفائل، جاب پوسٹنگ، جاب اپلائی، بڈنگ، یا نوٹیفیکیشنز۔  
+- اگر سوال ایپ سے براہ راست متعلق نہ ہو، تب بھی اپنی سمجھ کے مطابق سب سے قریبی جواب ایپ کے basic flow سے دیں۔  
+- کبھی بھی غیر متعلقہ یا عام معلومات نہ دیں۔  
+- context میں دی گئی معلومات کو جواب میں شامل کریں اگر ضروری ہو۔  
+
+موجودہ معلومات: ${context}
+      `
     },
     { role: "user", content: messageInUrdu }
   ],
