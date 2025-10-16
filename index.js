@@ -337,50 +337,90 @@ const findMatchingQuestion = (text) => {
   return similar;
 };
 
+const { Configuration, OpenAIApi } = require("openai");
+
+// Function to find most similar question using embeddings
+const findMostSimilarQuestion = async (text) => {
+  const messages = questionsData.map(q => q.text);
+
+  // Create embedding for user message
+  const userEmbedding = await openaiEmbeddings.embeddings.create({
+    model: "text-embedding-3-small",
+    input: text,
+  });
+
+  const userVector = userEmbedding.data[0].embedding;
+
+  // Compare with each question
+  let bestScore = -1;
+  let bestMatch = null;
+
+  for (let i = 0; i < messages.length; i++) {
+    const qEmbeddingRes = await openaiEmbeddings.embeddings.create({
+      model: "text-embedding-3-small",
+      input: messages[i],
+    });
+    const qVector = qEmbeddingRes.data[0].embedding;
+
+    // Cosine similarity
+    const dotProduct = userVector.reduce((sum, val, idx) => sum + val * qVector[idx], 0);
+    const magUser = Math.sqrt(userVector.reduce((sum, val) => sum + val * val, 0));
+    const magQ = Math.sqrt(qVector.reduce((sum, val) => sum + val * val, 0));
+    const similarity = dotProduct / (magUser * magQ);
+
+    if (similarity > bestScore) {
+      bestScore = similarity;
+      bestMatch = questionsData[i];
+    }
+  }
+
+  // Threshold 0.75 (adjust as needed)
+  if (bestScore > 0.75) return bestMatch;
+  return null;
+};
+
 app.post("/api/chat", async (req, res) => {
   try {
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: "Message is required" });
 
-    // Step 1: Translate user input to Urdu
+    // Translate to Urdu
     const translation = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "آپ کا کام صرف انگریزی یا کسی بھی زبان کو اردو میں ترجمہ کرنا ہے، بغیر جواب دیے۔" },
+        { role: "system", content: "آپ کا کام صرف کسی بھی زبان کو اردو میں ترجمہ کرنا ہے، بغیر جواب دیے۔" },
         { role: "user", content: message }
       ],
     });
 
     const messageInUrdu = translation.choices[0].message.content.trim();
 
-    // Step 2: Find exact or partial match
-    const matchedQuestion = findMatchingQuestion(messageInUrdu);
+    // Semantic similarity search
+    const matchedQuestion = await findMostSimilarQuestion(messageInUrdu);
     if (matchedQuestion) {
       return res.json({ reply: matchedQuestion.response });
     }
 
-    // Step 3: Generate a context-aware answer in Urdu based on app features
+    // Context-aware fallback
     const context = questionsData.map(q => `سوال: ${q.text} | جواب: ${q.response}`).join("\n");
-
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `آپ ایک AI اسسٹنٹ ہیں جو صرف مزدور اور ٹھیکیدار ایپ کے اندر موجود فیچرز کی بنیاد پر سوالات کے جواب دیتے ہیں۔ ہمیشہ جواب اردو میں دیں۔ اگر سوال مکمل طور پر مختلف ہو تو اپنی سمجھ کے مطابق سب سے قریب ترین اور متعلقہ جواب دیں۔ معلومات: ${context}`
+          content: `آپ ایک AI اسسٹنٹ ہیں جو صرف مزدور اور ٹھیکیدار ایپ کے اندر موجود فیچرز کے سوالات کے جواب دیتے ہیں۔ ہمیشہ اردو میں جواب دیں۔ اگر سوال مختلف انداز میں پوچھا گیا ہو تو سب سے قریب ترین جواب دیں۔ معلومات: ${context}`
         },
         { role: "user", content: messageInUrdu }
       ],
     });
 
-    const reply = response.choices[0].message.content;
-    res.json({ reply });
-
+    res.json({ reply: response.choices[0].message.content });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "سرور میں خرابی پیش آگئی" });
   }
 });
+
 
 
 
