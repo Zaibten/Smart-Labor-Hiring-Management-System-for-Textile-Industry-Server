@@ -16,6 +16,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const validator = require("validator");
+const twilio = require("twilio");
 require("dotenv").config();
 
 const app = express();
@@ -699,6 +700,80 @@ app.get("/api/me", async (req, res) => {
     return res.status(401).json({ error: "Invalid or expired token." });
   }
 });
+
+// ===================== FORGOT PASSWORD =====================
+// Check if user exists by email
+app.post("/api/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required." });
+
+    const user = await User.findOne({ email: String(email).trim().toLowerCase() });
+    if (!user) return res.status(404).json({ error: "No account found with this email." });
+
+    // You can send a reset email here if you want.
+    return res.status(200).json({ message: "User found. Proceed to reset password." });
+  } catch (err) {
+    console.error("Forgot Password error:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+app.post("/api/reset-password", async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword)
+      return res.status(400).json({ error: "Email and new password are required." });
+
+    const user = await User.findOne({ email: String(email).trim().toLowerCase() });
+    if (!user) return res.status(404).json({ error: "User not found." });
+
+    const isSame = await bcrypt.compare(newPassword, user.passwordHash);
+    if (isSame) {
+      return res.status(400).json({ error: "New password must be different from your old password." });
+    }
+
+    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+    user.passwordHash = passwordHash;
+    await user.save();
+
+    // ---------------- Normalize phone number ----------------
+    let normalizedPhone = user.phone.trim();
+    if (normalizedPhone.startsWith("0")) {
+      normalizedPhone = "+92" + normalizedPhone.slice(1);
+    }
+
+    // ---------------- Send SMS ----------------
+    try {
+      // SMS (trial: must be verified number)
+      await client.messages.create({
+        body: "Your Labour Hub Application password has been changed successfully.",
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: normalizedPhone,
+      }).catch(err => console.log("SMS send failed:", err));
+
+      // WhatsApp (sandbox)
+      await client.messages.create({
+        body: "Your Labour Hub Application password has been changed successfully.",
+        from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+        to: `whatsapp:${normalizedPhone}`,
+      }).catch(err => console.log("WhatsApp send failed:", err));
+    } catch (err) {
+      console.error("Twilio error:", err);
+    }
+
+    return res.status(200).json({ message: "Password reset successfully!" });
+  } catch (err) {
+    console.error("Reset Password error:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+
+
 
 /* ---------- DB connect & server start ---------- */
 async function start() {
