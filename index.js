@@ -9,6 +9,13 @@ const ffmpegPath = require("ffmpeg-static");
 const FormData = require("form-data");
 const fetch = require("node-fetch"); // If you get ESM issue, use v2: npm install node-fetch@2
 const OpenAI = require("openai");
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const validator = require("validator");
 require("dotenv").config();
 
 const app = express();
@@ -515,8 +522,212 @@ app.post("/api/transcribe", upload.single("file"), async (req, res) => {
   }
 });
 
+/* ---------- Basic middlewares ---------- */
+app.use(helmet());
+app.use(cors());
+app.use(express.json({ limit: "10kb" }));
+
+// small rate limiter for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // limit each IP to 10 requests per windowMs
+  message: { error: "Too many requests, please slow down." },
+});
+app.use("/api/", authLimiter);
+
+/* ---------- Mongoose user schema ---------- */
+const userSchema = new mongoose.Schema(
+  {
+    firstName: { type: String, required: true, trim: true, maxlength: 50 },
+    lastName: { type: String, required: true, trim: true, maxlength: 50 },
+    phone: { type: String, required: true, trim: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    passwordHash: { type: String, required: true },
+    role: { type: String, enum: ["Labour", "Contractor"], default: "Labour" },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+
+const User = mongoose.model("User", userSchema);
+
+/* ---------- Helpers ---------- */
+
+function validateSignupPayload(payload) {
+  const errors = [];
+
+  if (!payload.firstName || String(payload.firstName).trim().length < 2) {
+    errors.push("First name is required (min 2 characters).");
+  }
+  if (!payload.lastName || String(payload.lastName).trim().length < 1) {
+    errors.push("Last name is required.");
+  }
+  if (!payload.phone || !/^\+?[0-9]{7,15}$/.test(String(payload.phone).trim())) {
+    errors.push("Phone is required (digits only, 7-15 chars, optional leading +).");
+  }
+  if (!payload.email || !validator.isEmail(String(payload.email))) {
+    errors.push("A valid email is required.");
+  }
+  if (!payload.password || String(payload.password).length < 6) {
+    errors.push("Password is required (min 6 characters).");
+  }
+  if (!payload.role || !["Labour", "Contractor"].includes(payload.role)) {
+    errors.push("Role must be either 'Labour' or 'Contractor'.");
+  }
+
+  return errors;
+}
+
+function signJwt(user) {
+  const secret = process.env.JWT_SECRET;
+  const expiresIn = process.env.JWT_EXPIRES_IN || "7d";
+  return jwt.sign(
+    { sub: user._id.toString(), email: user.email, role: user.role },
+    secret,
+    { expiresIn }
+  );
+}
+
+/* ---------- API routes ---------- */
+
+/**
+ * POST /api/signup
+ * body: { firstName, lastName, phone, email, password, role }
+ */
+app.post("/api/signup", async (req, res) => {
+  try {
+    const { firstName, lastName, phone, email, password, role } = req.body || {};
+
+    // validate input
+    const validationErrors = validateSignupPayload({ firstName, lastName, phone, email, password, role });
+    if (validationErrors.length) {
+      return res.status(400).json({ errors: validationErrors });
+    }
+
+    // normalize email/phone
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const normalizedPhone = String(phone).trim();
+
+    // check duplicate email
+    const existing = await User.findOne({ email: normalizedEmail }).lean();
+    if (existing) {
+      return res.status(409).json({ error: "Email already in use." });
+    }
+
+    // hash password
+    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // create user
+    const user = new User({
+      firstName: String(firstName).trim(),
+      lastName: String(lastName).trim(),
+      phone: normalizedPhone,
+      email: normalizedEmail,
+      passwordHash,
+      role,
+    });
+
+    await user.save();
+
+    // sign token
+    const token = signJwt(user);
+
+    // return user data (excluding passwordHash)
+    const userResponse = {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+    };
+
+    return res.status(201).json({ user: userResponse, token });
+  } catch (err) {
+    console.error("Signup error:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+/* Optional: small login route for convenience */
+app.post("/api/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: "Email and password required." });
+
+    const user = await User.findOne({ email: String(email).trim().toLowerCase() });
+    if (!user) return res.status(401).json({ error: "Invalid credentials." });
+
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) return res.status(401).json({ error: "Invalid credentials." });
+
+    const token = signJwt(user);
+    return res.json({
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
+      token,
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+/* Protected test endpoint example */
+app.get("/api/me", async (req, res) => {
+  try {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith("Bearer ")) return res.status(401).json({ error: "Missing token." });
+    const token = auth.slice(7);
+    const secret = process.env.JWT_SECRET;
+    const decoded = jwt.verify(token, secret);
+    const userId = decoded.sub;
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ error: "User not found." });
+
+    return res.json({ user: { id: user._id, email: user.email, firstName: user.firstName, role: user.role } });
+  } catch (err) {
+    console.error("Auth error:", err);
+    return res.status(401).json({ error: "Invalid or expired token." });
+  }
+});
+
+/* ---------- DB connect & server start ---------- */
+async function start() {
+  if (!process.env.MONGO_URI) {
+    console.error("MONGO_URI missing in .env");
+    process.exit(1);
+  }
+  if (!process.env.JWT_SECRET) {
+    console.error("JWT_SECRET missing in .env");
+    process.exit(1);
+  }
+
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log("Connected to MongoDB");
+   
+  } catch (err) {
+    console.error("Failed to connect to MongoDB:", err);
+    process.exit(1);
+  }
+}
+
+start();
+
 // Root endpoint
-app.get("/", (req, res) => res.send("🚀 Transcription API is running!"));
+app.get("/", (req, res) => res.send("🚀 Labour Hub APIs areS running!"));
 
 const port = process.env.PORT || 3000;
 app.listen(port, () =>
