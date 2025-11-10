@@ -905,7 +905,60 @@ app.get("/api/my-jobs-email/:email", async (req, res) => {
   }
 });
 
+app.get("/api/filter", async (req, res) => {
+  try {
+    const {
+      userEmail, // current logged-in user to exclude their jobs
+      location,
+      skill,
+      startDate,
+      endDate,
+      minBudget,
+      maxBudget,
+    } = req.query;
 
+    // Build dynamic query
+    const query = {};
+
+    // Exclude current user's jobs
+    if (userEmail) {
+      query["createdBy.email"] = { $ne: userEmail };
+    }
+
+    if (location) query.location = location;
+    if (skill) query.skill = skill;
+
+    if (startDate && endDate) {
+      query.startDate = { $gte: new Date(startDate) };
+      query.endDate = { $lte: new Date(endDate) };
+    } else if (startDate) {
+      query.startDate = { $gte: new Date(startDate) };
+    } else if (endDate) {
+      query.endDate = { $lte: new Date(endDate) };
+    }
+
+    if (minBudget || maxBudget) {
+      query.budget = {};
+      if (minBudget) query.budget.$gte = Number(minBudget);
+      if (maxBudget) query.budget.$lte = Number(maxBudget);
+    }
+
+    // Fetch filtered jobs
+    const jobs = await Job.find(query).sort({ createdAt: -1 });
+
+    // Fetch dropdown options dynamically
+    const cities = await Job.distinct("location");
+    const skillsList = await Job.distinct("skill");
+
+    res.status(200).json({
+      filters: { cities, skills: skillsList },
+      jobs,
+    });
+  } catch (err) {
+    console.error("Filter Jobs Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 /* ---------- DB connect & server start ---------- */
 async function start() {
