@@ -545,13 +545,17 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ["Labour", "Contractor"], default: "Labour" },
-    image: { type: String, default: "" }, // <-- added image field
+    image: { 
+      type: String, 
+      default: "https://res.cloudinary.com/dh7kv5dzy/image/upload/v1762757911/Pngtree_user_profile_avatar_13369988_qdlgmg.png" 
+    },
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
 const User = mongoose.model("User", userSchema);
+
 
 /* ---------- Helpers ---------- */
 
@@ -794,6 +798,114 @@ app.get("/api/user/:id", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+
+
+// ==================== SCHEMA ====================
+const jobSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+  location: { type: String, required: true },
+  workersRequired: { type: Number, required: true },
+  skill: { type: String, required: true },
+  budget: { type: Number, required: true },
+  contact: { type: String, required: true },
+  startDate: { type: Date, required: true },
+  endDate: { type: Date, required: true },
+  createdBy: {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    firstName: String,
+    lastName: String,
+    role: String,
+    image: String,
+    email: String, // NEW FIELD
+  },
+  applicants: [
+    {
+      laborId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      appliedAt: { type: Date, default: Date.now },
+      status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
+      chatId: { type: mongoose.Schema.Types.ObjectId, ref: "Chat" },
+    }
+  ],
+  createdAt: { type: Date, default: Date.now },
+});
+
+const Job = mongoose.model("Job", jobSchema);
+
+
+// ==================== ROUTE ====================
+// Create a new job
+app.post("/api/jobs", async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      location,
+      workersRequired,
+      skill,
+      budget,
+      contact,
+      startDate,
+      endDate,
+      createdBy,
+    } = req.body;
+
+    if (!title || !description || !location || !workersRequired || !skill || !budget || !contact || !startDate || !endDate) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+
+    const job = new Job({
+      title,
+      description,
+      location,
+      workersRequired,
+      skill,
+      budget,
+      contact,
+      startDate,
+      endDate,
+      createdBy: {
+        ...createdBy,
+        email: createdBy.email, // store email here
+      },
+    });
+
+    await job.save();
+    return res.status(201).json({ message: "Job created successfully", job });
+  } catch (err) {
+    console.error("Error creating job:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+
+
+// ==================== 1. Get all jobs ====================
+app.get("/api/alljobs", async (req, res) => {
+  try {
+    const jobs = await Job.find().sort({ createdAt: -1 }); // latest jobs first
+    res.status(200).json(jobs);
+  } catch (err) {
+    console.error("Error fetching jobs:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+// ==================== 2. Get jobs created by a specific contractor by email ====================
+app.get("/api/my-jobs-email/:email", async (req, res) => {
+  const { email } = req.params;
+  try {
+    const jobs = await Job.find({ "createdBy.email": email }).sort({ createdAt: -1 });
+    res.status(200).json(jobs);
+  } catch (err) {
+    console.error(`Error fetching jobs for ${email}:`, err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+
 
 /* ---------- DB connect & server start ---------- */
 async function start() {
