@@ -545,6 +545,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ["Labour", "Contractor"], default: "Labour" },
+    image: { type: String, default: "" }, // <-- added image field
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
@@ -773,7 +774,26 @@ app.post("/api/reset-password", async (req, res) => {
 });
 
 
+const DEFAULT_IMAGE = "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png";
 
+// API to get user by ID
+app.get("/api/user/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("firstName lastName role email image");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      role: user.role || "",
+      email: user.email || "",
+      image: user.image && user.image.trim() !== "" ? user.image : DEFAULT_IMAGE,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 /* ---------- DB connect & server start ---------- */
 async function start() {
