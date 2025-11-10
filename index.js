@@ -17,6 +17,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const validator = require("validator");
 const twilio = require("twilio");
+const sgMail = require("@sendgrid/mail");
 require("dotenv").config();
 
 const app = express();
@@ -726,6 +727,9 @@ app.post("/api/forgot-password", async (req, res) => {
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
+// ---------------- SendGrid Setup ----------------
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
 app.post("/api/reset-password", async (req, res) => {
   try {
     const { email, newPassword } = req.body;
@@ -736,38 +740,27 @@ app.post("/api/reset-password", async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found." });
 
     const isSame = await bcrypt.compare(newPassword, user.passwordHash);
-    if (isSame) {
-      return res.status(400).json({ error: "New password must be different from your old password." });
-    }
+    if (isSame) return res.status(400).json({ error: "New password must be different from your old password." });
 
     const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
     const passwordHash = await bcrypt.hash(newPassword, saltRounds);
     user.passwordHash = passwordHash;
     await user.save();
 
-    // ---------------- Normalize phone number ----------------
-    let normalizedPhone = user.phone.trim();
-    if (normalizedPhone.startsWith("0")) {
-      normalizedPhone = "+92" + normalizedPhone.slice(1);
-    }
-
-    // ---------------- Send SMS ----------------
+    // ---------------- Send Email ----------------
     try {
-      // SMS (trial: must be verified number)
-      await client.messages.create({
-        body: "Your Labour Hub Application password has been changed successfully.",
-        from: process.env.TWILIO_PHONE_NUMBER,
-        to: normalizedPhone,
-      }).catch(err => console.log("SMS send failed:", err));
+      const msg = {
+        to: user.email,
+        from: process.env.SENDGRID_VERIFIED_SENDER,
+        subject: "Labour Hub Application - Password Changed",
+        text: "Your Labour Hub Application password has been changed successfully.",
+        html: "<p>Your Labour Hub Application password has been changed successfully.</p>",
+      };
 
-      // WhatsApp (sandbox)
-      await client.messages.create({
-        body: "Your Labour Hub Application password has been changed successfully.",
-        from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
-        to: `whatsapp:${normalizedPhone}`,
-      }).catch(err => console.log("WhatsApp send failed:", err));
+      await sgMail.send(msg);
+      console.log(`Email sent to ${user.email}`);
     } catch (err) {
-      console.error("Twilio error:", err);
+      console.error("Email send failed:", err.response ? err.response.body : err);
     }
 
     return res.status(200).json({ message: "Password reset successfully!" });
@@ -776,6 +769,7 @@ app.post("/api/reset-password", async (req, res) => {
     return res.status(500).json({ error: "Internal server error." });
   }
 });
+
 
 
 const DEFAULT_IMAGE = "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png";
