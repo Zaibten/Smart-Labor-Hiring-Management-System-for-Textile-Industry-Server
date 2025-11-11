@@ -751,65 +751,50 @@ app.post("/api/reset-password", async (req, res) => {
     await user.save();
 
     // ---------------- Read and Encode Logo ----------------
-    const logoPath = "assets/logo.png";
-    const logoBase64 = fs.readFileSync(logoPath).toString("base64");
+   const logoUrl = "https://res.cloudinary.com/dh7kv5dzy/image/upload/v1762834364/logo_je7mnb.png";
+
 
     // ---------------- Send Email ----------------
     try {
-      const msg = {
-        to: user.email,
-        from: process.env.SENDGRID_VERIFIED_SENDER,
-        subject: "Labour Hub - Password Changed Successfully",
-        text: "Your Labour Hub Application password has been changed successfully.",
-        html: `
-        <div style="font-family: 'Segoe UI', sans-serif; background-color: #f5f7fa; padding: 40px 0;">
-          <div style="max-width: 600px; background-color: #ffffff; margin: 0 auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            
-            <!-- Header -->
-            <div style="background-color: #0a66c2; padding: 25px 20px; text-align: center;">
-              <img src="cid:logo" alt="Labour Hub Logo" width="70" height="70" style="border-radius: 50%; border: 2px solid #ffffff; margin-bottom: 10px;">
-              <h1 style="color: #ffffff; font-size: 24px; margin: 0;">Labour Hub</h1>
-            </div>
+const msg = {
+  to: user.email,
+  from: process.env.SENDGRID_VERIFIED_SENDER,
+  subject: "Labour Hub - Password Changed Successfully",
+  html: `
+    <div style="font-family: 'Segoe UI', sans-serif; background-color: #f5f7fa; padding: 40px 0;">
+      <div style="max-width: 600px; background-color: #ffffff; margin: 0 auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        
+        <div style="background-color: #0a66c2; padding: 25px 20px; text-align: center;">
+          <img src="${logoUrl}" alt="Labour Hub Logo" width="70" height="70" style="border-radius: 50%; border: 2px solid #ffffff; margin-bottom: 10px;">
+          <h1 style="color: #ffffff; font-size: 24px; margin: 0;">Labour Hub</h1>
+        </div>
 
-            <!-- Body -->
-            <div style="padding: 30px 25px; color: #333333;">
-              <h2 style="color: #0a66c2; font-size: 20px;">Password Changed Successfully</h2>
-              <p style="font-size: 16px; line-height: 1.6;">
-                Dear <strong>${user.email}</strong>,<br><br>
-                We wanted to let you know that your <strong>Labour Hub</strong> account password has been updated successfully.
-              </p>
-
-              <p style="font-size: 16px; line-height: 1.6;">
-                If you did not request this change, please contact our support team immediately.
-              </p>
-
-              <div style="text-align: center; margin-top: 30px;">
-                <a href="https://labourhub.pk/login" style="background-color: #0a66c2; color: white; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: bold;">
-                  Go to Login
-                </a>
-              </div>
-            </div>
-
-            <!-- Footer -->
-            <div style="background-color: #f0f2f5; text-align: center; padding: 20px; border-top: 1px solid #e1e4e8;">
-              <p style="color: #777777; font-size: 13px; margin: 0;">
-                &copy; ${new Date().getFullYear()} Labour Hub. All rights reserved.<br>
-                Karachi, Pakistan
-              </p>
-            </div>
+        <div style="padding: 30px 25px; color: #333333;">
+          <h2 style="color: #0a66c2; font-size: 20px;">Password Changed Successfully</h2>
+          <p style="font-size: 16px; line-height: 1.6;">
+            Dear <strong>${user.email}</strong>,<br><br>
+            Your <strong>Labour Hub</strong> account password has been changed successfully.
+          </p>
+          <p>If this wasn't you, please contact our support team immediately.</p>
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="https://labourhub.pk/login" style="background-color: #0a66c2; color: white; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: bold;">
+              Go to Login
+            </a>
           </div>
         </div>
-        `,
-        attachments: [
-          {
-            content: logoBase64,
-            filename: "logo.png",
-            type: "image/png",
-            disposition: "inline",
-            content_id: "logo",
-          },
-        ],
-      };
+
+        <div style="background-color: #f0f2f5; text-align: center; padding: 20px; border-top: 1px solid #e1e4e8;">
+          <p style="color: #777777; font-size: 13px; margin: 0;">
+            &copy; ${new Date().getFullYear()} Labour Hub. All rights reserved.<br>
+            Karachi, Pakistan
+          </p>
+        </div>
+      </div>
+    </div>
+  `,
+};
+await sgMail.send(msg);
+
 
       await sgMail.send(msg);
       console.log(`✅ Email sent successfully to ${user.email}`);
