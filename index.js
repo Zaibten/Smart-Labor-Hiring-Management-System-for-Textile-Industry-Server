@@ -20,6 +20,7 @@ const twilio = require("twilio");
 const sgMail = require("@sendgrid/mail");
 require("dotenv").config();
 
+
 const app = express();
 app.use(express.json());
 
@@ -992,6 +993,116 @@ app.get("/api/filter", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// Industry Mongoose Schema
+const industrySchema = new mongoose.Schema({
+  industry: { type: String, required: true },
+  owner: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  phone: { type: String, required: true },
+  address: { type: String, required: true },
+  textileType: { type: String, required: true },
+  password: { type: String, required: true }, // hashed
+}, { timestamps: true })
+
+const Industry = mongoose.model('Industry', industrySchema)
+
+// Create Industry API
+app.post('/api/industries', async (req, res) => {
+  try {
+    const { industry, owner, email, phone, address, textileType, password } = req.body
+
+    // Validate required fields
+    if (!industry || !owner || !email || !phone || !address || !textileType || !password) {
+      return res.status(400).json({ message: 'All fields are required' })
+    }
+
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ message: 'Invalid email format' })
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters' })
+    }
+
+    // Check if email already exists
+    const existing = await Industry.findOne({ email })
+    if (existing) return res.status(400).json({ message: 'Email already registered' })
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    // Save to DB
+    const newIndustry = await Industry.create({
+      industry,
+      owner,
+      email,
+      phone,
+      address,
+      textileType,
+      password: hashedPassword
+    })
+
+    res.status(201).json({ message: 'Industry registered successfully', industry: newIndustry })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
+// Login API
+app.post('/api/industries/login', async (req, res) => {
+  try {
+    const { email, password } = req.body
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' })
+    }
+
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ message: 'Invalid email format' })
+    }
+
+    // Find user
+    const industry = await Industry.findOne({ email })
+    if (!industry) return res.status(400).json({ message: 'Invalid credentials' })
+
+    // Compare password
+    const isMatch = await bcrypt.compare(password, industry.password)
+    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' })
+
+    // Create JWT token (valid for 7 days)
+    const token = jwt.sign({ id: industry._id, email: industry.email }, 'YOUR_SECRET_KEY', {
+      expiresIn: '7d',
+    })
+
+    res.status(200).json({ message: 'Login successful', email: industry.email, token })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
+// API to get industry profile by email
+app.get('/api/industries/profile', async (req, res) => {
+  try {
+    const { email } = req.query
+
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ message: 'Email is required' })
+    }
+
+    const industry = await Industry.findOne({ email }).select('-password') // exclude password
+    if (!industry) {
+      return res.status(404).json({ message: 'Industry not found' })
+    }
+
+    res.status(200).json(industry)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
 
 /* ---------- DB connect & server start ---------- */
 async function start() {
