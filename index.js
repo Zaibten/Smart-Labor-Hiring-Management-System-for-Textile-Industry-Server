@@ -558,6 +558,19 @@ const userSchema = new mongoose.Schema(
 
 const User = mongoose.model("User", userSchema);
 
+// Get user by email
+app.get("/api/user-by-email/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+    const user = await User.findOne({ email }).select("firstName lastName email image role");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 
 /* ---------- Helpers ---------- */
 
@@ -835,38 +848,82 @@ app.get("/api/user/:id", async (req, res) => {
 
 
 
+
 // ==================== SCHEMA ====================
 const jobSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  description: { type: String, required: true },
-  location: { type: String, required: true },
-  workersRequired: { type: Number, required: true },
-  skill: { type: String, required: true },
-  budget: { type: Number, required: true },
-  contact: { type: String, required: true },
-  startDate: { type: Date, required: true },
-  endDate: { type: Date, required: true },
+  title: String,
+  description: String,
+  location: String,
+  workersRequired: Number,
+  skill: String,
+  budget: Number,
+  contact: String,
+  startDate: Date,
+  endDate: Date,
   createdBy: {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     firstName: String,
     lastName: String,
     role: String,
-    image: String,
-    email: String, // NEW FIELD
+    email: String,
   },
   applicants: [
     {
       laborId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       appliedAt: { type: Date, default: Date.now },
-      status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
+      status: { type: String, enum: ["pending","accepted","rejected"], default: "pending" },
       chatId: { type: mongoose.Schema.Types.ObjectId, ref: "Chat" },
     }
   ],
-  createdAt: { type: Date, default: Date.now },
-});
+  noOfWorkersApplied: { type: Number, default: 0 }, // NEW
+}, { timestamps: true });
 
 const Job = mongoose.model("Job", jobSchema);
 
+
+const jobApplicationSchema = new mongoose.Schema({
+  jobId: { type: mongoose.Schema.Types.ObjectId, ref: "Job", required: true },
+  contractorEmail: { type: String, required: true },
+  labourEmail: { type: String, required: true },
+  appliedAt: { type: Date, default: Date.now },
+});
+
+
+
+const JobApplication = mongoose.model("JobApplication", jobApplicationSchema);
+module.exports = JobApplication;
+
+
+app.post("/api/jobs/apply/:jobId", async (req, res) => {
+  const { jobId } = req.params;
+  const { labourId, labourEmail } = req.body; // labour info
+
+  try {
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    // Check if labour already applied
+    const alreadyApplied = job.applicants.some(app => app.laborId.toString() === labourId);
+    if (alreadyApplied) return res.status(400).json({ message: "Already applied" });
+
+    // Add labour to job
+    job.applicants.push({ laborId: labourId });
+    job.noOfWorkersApplied = job.applicants.length;
+    await job.save();
+
+    // Save in JobApplications collection
+    await JobApplication.create({
+      jobId: job._id,
+      contractorEmail: job.createdBy.email,
+      labourEmail,
+    });
+
+    res.status(200).json({ message: "Applied successfully", job });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
 
 // ==================== ROUTE ====================
 // Create a new job
@@ -993,6 +1050,68 @@ app.get("/api/filter", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// ==================== PROFILE API ====================
+app.get("/api/profile/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+    const user = await User.findOne({ email: email.trim().toLowerCase() })
+      .select("firstName lastName role email image createdAt")
+      .lean();
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Default image if missing
+    const DEFAULT_IMAGE =
+      "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png";
+    user.image = user.image?.trim() || DEFAULT_IMAGE;
+
+    let jobsCreated = [];
+    let jobsApplied = [];
+    let totalApplicantsOnJobs = 0;
+
+    if (user.role === "Contractor") {
+      // Fetch jobs posted by contractor
+      jobsCreated = await Job.find({ "createdBy.email": email })
+        .sort({ createdAt: -1 })
+        .lean();
+
+      // Count total applicants across all their jobs
+      totalApplicantsOnJobs = jobsCreated.reduce((acc, job) => acc + (job.applicants?.length || 0), 0);
+    } else if (user.role === "Labour") {
+      // Fetch jobs applied to by labour
+      const applications = await Job.find({ "applicants.laborId": user._id })
+        .sort({ createdAt: -1 })
+        .lean();
+
+      jobsApplied = applications.map(job => {
+        const applicant = job.applicants.find(a => a.laborId.toString() === user._id.toString());
+        return {
+          jobId: job._id,
+          title: job.title,
+          status: applicant?.status || "pending",
+          appliedAt: applicant?.appliedAt || null,
+          contractor: job.createdBy,
+        };
+      });
+    }
+
+    res.json({
+      user,
+      stats: {
+        totalJobsPosted: jobsCreated.length,
+        totalJobsApplied: jobsApplied.length,
+        totalApplicantsOnJobs,
+      },
+      jobsCreated,
+      jobsApplied,
+    });
+  } catch (err) {
+    console.error("Profile API error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 
 // Industry Mongoose Schema
 const industrySchema = new mongoose.Schema({
