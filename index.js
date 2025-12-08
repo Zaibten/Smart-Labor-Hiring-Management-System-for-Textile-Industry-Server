@@ -1338,6 +1338,35 @@ app.get("/api/get-user-by-email/:email", async (req, res) => {
   }
 });
 
+// ================= Check Application Status (Using Logged-in User) =================
+app.get("/api/check-application/:jobId", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const userEmail = req.query.email?.trim().toLowerCase();
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "Email is required for testing" });
+    }
+
+    const application = await JobApplication.findOne({
+      jobId,
+      labourEmail: userEmail
+    });
+
+    res.json({
+      applied: !!application,
+      message: application
+        ? "User already applied"
+        : "User has not applied"
+    });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+
 
 // Industry Mongoose Schema
 const industrySchema = new mongoose.Schema({
