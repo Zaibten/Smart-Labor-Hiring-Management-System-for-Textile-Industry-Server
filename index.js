@@ -3,6 +3,7 @@ const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegPath = require("ffmpeg-static");
@@ -18,6 +19,8 @@ const rateLimit = require("express-rate-limit");
 const validator = require("validator");
 const twilio = require("twilio");
 const sgMail = require("@sendgrid/mail");
+const chatRoutes = require("./chat");
+const { Server } = require("socket.io");
 require("dotenv").config();
 
 
@@ -537,6 +540,19 @@ const authLimiter = rateLimit({
   message: { error: "Too many requests, please slow down." },
 });
 app.use("/api/", authLimiter);
+
+// Create HTTP server
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Or your frontend URL
+    methods: ["GET", "POST"]
+  }
+});
+
+app.use("/api/chat", chatRoutes);
 
 /* ---------- Mongoose user schema ---------- */
 const userSchema = new mongoose.Schema(
@@ -1219,6 +1235,108 @@ app.get("/api/responses-by-contractor/:email", async (req, res) => {
 });
 
 
+// // ------------------- Chat Schema -------------------
+// const chatSchema = new mongoose.Schema(
+//   {
+//     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }],
+//     messages: [
+//       {
+//         sender: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+//         text: { type: String, required: true },
+//         timestamp: { type: Date, default: Date.now },
+//       },
+//     ],
+//   },
+//   { timestamps: true }
+// );
+
+// const Chat = mongoose.model("Chat", chatSchema);
+
+// // ------------------- API -------------------
+// // Get chat history between two users
+// app.get("/api/chats/:user1/:user2", async (req, res) => {
+//   try {
+//     // Use `new` keyword for ObjectId
+//     const user1 = new mongoose.Types.ObjectId(req.params.user1);
+//     const user2 = new mongoose.Types.ObjectId(req.params.user2);
+
+//     let chat = await Chat.findOne({ participants: { $all: [user1, user2] } })
+//       .populate("messages.sender", "firstName lastName email image")
+//       .lean();
+
+//     if (!chat) chat = { messages: [] };
+
+//     const messagesWithSenderInfo = chat.messages.map((msg) => ({
+//       ...msg,
+//       senderInfo: msg.sender,
+//     }));
+
+//     res.json({ messages: messagesWithSenderInfo });
+//   } catch (err) {
+//     console.error("Fetch chat error:", err);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+
+// // ------------------- Socket.IO -------------------
+// io.on("connection", (socket) => {
+//   console.log("New socket connected:", socket.id);
+
+//   // Join room
+//   socket.on("join", (userId) => {
+//     socket.join(userId);
+//     console.log(`User ${userId} joined room`);
+//   });
+
+//   // Send message
+//   socket.on("sendMessage", async ({ senderId, receiverId, text }) => {
+//     try {
+//       if (!senderId || !receiverId || !text.trim()) return;
+
+//       const senderObjId = mongoose.Types.ObjectId(senderId);
+//       const receiverObjId = mongoose.Types.ObjectId(receiverId);
+
+//       let chat = await Chat.findOne({
+//         participants: { $all: [senderObjId, receiverObjId] },
+//       });
+
+//       if (!chat) chat = new Chat({ participants: [senderObjId, receiverObjId], messages: [] });
+
+//       chat.messages.push({ sender: senderObjId, text });
+//       await chat.save();
+
+//       const populatedChat = await Chat.findById(chat._id).populate(
+//         "messages.sender",
+//         "firstName lastName email image"
+//       );
+
+//       const lastMessage = populatedChat.messages[populatedChat.messages.length - 1].toObject();
+
+//       const messageToSend = { ...lastMessage, senderInfo: lastMessage.sender };
+
+//       // Emit to both users
+//       io.to(senderId).emit("receiveMessage", messageToSend);
+//       io.to(receiverId).emit("receiveMessage", messageToSend);
+
+//       console.log("Message saved and sent:", messageToSend);
+//     } catch (err) {
+//       console.error("Send message error:", err);
+//     }
+//   });
+// });
+
+// Get user by email
+app.get("/api/get-user-by-email/:email", async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.params.email }).lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ id: user._id });
+  } catch (err) {
+    console.error("Fetch user error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 
 // Industry Mongoose Schema
