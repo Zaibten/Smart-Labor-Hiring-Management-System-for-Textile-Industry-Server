@@ -1113,6 +1113,114 @@ app.get("/api/profile/:email", async (req, res) => {
 });
 
 
+// ==================== Get jobs a user applied to ====================
+app.get("/api/jobs/user/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    // Find user
+    const user = await User.findOne({ email: email.trim().toLowerCase() }).lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Jobs the user created (if Contractor)
+    const jobsCreated = await Job.find({ "createdBy.email": email }).sort({ createdAt: -1 }).lean();
+
+    // Jobs the user applied to (from JobApplication collection)
+    const jobApplications = await JobApplication.find({ labourEmail: email }).lean();
+
+    const jobsApplied = [];
+    for (const app of jobApplications) {
+      const job = await Job.findById(app.jobId).lean();
+      if (!job) continue;
+
+      jobsApplied.push({
+        jobId: job._id,
+        title: job.title,
+        status: "pending", // default or you can extend to fetch from Job.applicants
+        appliedAt: app.appliedAt,
+        contractor: {
+          firstName: job.createdBy.firstName,
+          lastName: job.createdBy.lastName,
+          email: job.createdBy.email,
+          role: job.createdBy.role,
+          image: job.createdBy.image || "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png",
+        },
+      });
+    }
+
+    res.status(200).json({
+      user: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        image: user.image || "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png",
+      },
+      stats: {
+        totalJobsPosted: jobsCreated.length,
+        totalJobsApplied: jobsApplied.length,
+      },
+      jobsCreated,
+      jobsApplied,
+    });
+  } catch (err) {
+    console.error("Error fetching user jobs:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+// ==================== Get all responses for jobs posted by a contractor ====================
+app.get("/api/responses-by-contractor/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    // Step 1: Find all job applications for this contractor
+    const applications = await JobApplication.find({ contractorEmail: email }).lean();
+    if (!applications || applications.length === 0) {
+      return res.status(404).json({ message: "No responses found for this contractor" });
+    }
+
+    // Step 2: For each application, fetch job info and labour info
+    const results = [];
+    for (const app of applications) {
+      const job = await Job.findById(app.jobId).lean();
+      if (!job) continue;
+
+      const labour = await User.findOne({ email: app.labourEmail }).lean();
+
+      results.push({
+        applicationId: app._id,
+        jobId: job._id,
+        jobTitle: job.title,
+        jobDescription: job.description,
+        location: job.location,
+        workersRequired: job.workersRequired,
+        appliedAt: app.appliedAt,
+        labour: {
+          labourId: labour?._id || null,
+          firstName: labour?.firstName || "Unknown",
+          lastName: labour?.lastName || "Unknown",
+          email: labour?.email || app.labourEmail,
+          role: labour?.role || "Labour",
+          image: labour?.image || "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png",
+        },
+      });
+    }
+
+    res.status(200).json({
+      contractorEmail: email,
+      totalResponses: results.length,
+      responses: results,
+    });
+  } catch (err) {
+    console.error("Error fetching contractor responses:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+
+
+
 // Industry Mongoose Schema
 const industrySchema = new mongoose.Schema({
   industry: { type: String, required: true },
