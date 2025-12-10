@@ -17,6 +17,39 @@ const Chat = mongoose.model("Chat", chatSchema);
 
 // ==================== ROUTES ====================
 
+// GET /api/chat/all/:email
+router.get("/all/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+
+    // Get all chats involving this user
+    const chats = await Chat.find({
+      $or: [{ senderEmail: email }, { receiverEmail: email }],
+    }).sort({ timestamp: -1 });
+
+    // Group by unique users
+    const usersMap = {};
+
+    chats.forEach((chat) => {
+      const other =
+        chat.senderEmail === email ? chat.receiverEmail : chat.senderEmail;
+
+      if (!usersMap[other]) {
+        usersMap[other] = {
+          email: other,
+          lastMessage: chat.message,
+          timestamp: chat.timestamp,
+        };
+      }
+    });
+
+    res.json(Object.values(usersMap));
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 // Send a chat
 // POST /api/chat/send
 // body: { senderEmail, receiverEmail, message }
