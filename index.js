@@ -876,6 +876,9 @@ const jobSchema = new mongoose.Schema({
   contact: String,
   startDate: Date,
   endDate: Date,
+  shift: { type: String, default: "Shift A" },
+jobTime: { type: Date, default: Date.now },
+
   createdBy: {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     firstName: String,
