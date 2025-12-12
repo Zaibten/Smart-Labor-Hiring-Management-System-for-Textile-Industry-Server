@@ -567,12 +567,118 @@ const userSchema = new mongoose.Schema(
       type: String, 
       default: "https://res.cloudinary.com/dh7kv5dzy/image/upload/v1762757911/Pngtree_user_profile_avatar_13369988_qdlgmg.png" 
     },
+    skills: { type: [String], default: [] }, // <-- added
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
 const User = mongoose.model("User", userSchema);
+
+// ---------- Get Current User ----------
+app.get("/api/user/:userId", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ---------- Get Skills by Email ----------
+app.get("/api/user/skills/:email", async (req, res) => {
+  try {
+    const email = req.params.email.toLowerCase().trim();
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    return res.json({
+      success: true,
+      email: user.email,
+      skills: user.skills || []
+    });
+
+  } catch (err) {
+    console.error("Error fetching skills:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching skills",
+    });
+  }
+});
+
+// ---------- Add Skill ----------
+app.post("/api/user/:email/skills", async (req, res) => {
+  try {
+    const email = req.params.email.toLowerCase().trim();
+    const { skill } = req.body;
+
+    if (!skill || !skill.trim()) {
+      return res.status(400).json({ success: false, message: "Skill is required" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Prevent duplicates
+    if (user.skills.includes(skill.trim())) {
+      return res.json({ success: true, message: "Skill already exists" });
+    }
+
+    user.skills.push(skill.trim());
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Skill added successfully",
+      skills: user.skills,
+    });
+  } catch (err) {
+    console.error("Error adding skill:", err);
+    res.status(500).json({ success: false, message: "Server error while adding skill" });
+  }
+});
+
+// ---------- Delete Skill ----------
+app.delete("/api/user/:email/skills/:index", async (req, res) => {
+  try {
+    const email = req.params.email.toLowerCase().trim();
+    const index = parseInt(req.params.index);
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (index < 0 || index >= user.skills.length) {
+      return res.status(400).json({ success: false, message: "Invalid skill index" });
+    }
+
+    // Remove the skill by index
+    user.skills.splice(index, 1);
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Skill deleted successfully",
+      skills: user.skills,
+    });
+  } catch (err) {
+    console.error("Error deleting skill:", err);
+    res.status(500).json({ success: false, message: "Server error while deleting skill" });
+  }
+});
+
 
 // Get user by email
 app.get("/api/user-by-email/:email", async (req, res) => {
@@ -1234,6 +1340,39 @@ app.get("/api/responses-by-contractor/:email", async (req, res) => {
   } catch (err) {
     console.error("Error fetching contractor responses:", err);
     res.status(500).json({ message: "Server Error" });
+  }
+});
+
+// ==================== SEARCH JOBS (by skill + name) ====================
+app.get("/api/search-jobs", async (req, res) => {
+  try {
+    const { skill, name } = req.query;
+
+    // Build query object dynamically
+    const query = {};
+
+    if (skill && skill.trim() !== "") {
+      query.skill = { $regex: new RegExp(skill, "i") };  // case-insensitive match
+    }
+
+    if (name && name.trim() !== "") {
+      query.title = { $regex: new RegExp(name, "i") };
+    }
+
+    const jobs = await Job.find(query).sort({ createdAt: -1 });
+
+    return res.json({
+      success: true,
+      count: jobs.length,
+      jobs,
+    });
+
+  } catch (err) {
+    console.error("Search Jobs Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error while searching jobs",
+    });
   }
 });
 
