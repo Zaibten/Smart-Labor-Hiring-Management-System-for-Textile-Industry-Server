@@ -1021,20 +1021,25 @@ module.exports = JobApplication;
 
 app.post("/api/jobs/apply/:jobId", async (req, res) => {
   const { jobId } = req.params;
-  const { labourId, labourEmail } = req.body; // labour info
+const { labourId, labourEmail } = req.body;
+
 
   try {
     const job = await Job.findById(jobId);
     if (!job) return res.status(404).json({ message: "Job not found" });
 
     // Check if labour already applied
-    const alreadyApplied = job.applicants.some(app => app.laborId.toString() === labourId);
+const alreadyApplied = job.applicants.some(
+  app => app.laborId && app.laborId.toString() === labourId
+);
+
     if (alreadyApplied) return res.status(400).json({ message: "Already applied" });
 
     // Add labour to job
-    job.applicants.push({ laborId: labourId });
-    job.noOfWorkersApplied = job.applicants.length;
-    await job.save();
+job.applicants.push({ laborId: labourId, appliedAt: new Date(), status: "pending" });
+job.noOfWorkersApplied = job.applicants.length;
+await job.save();
+
 
     // Save in JobApplications collection
     await JobApplication.create({
@@ -1375,6 +1380,45 @@ app.get("/api/search-jobs", async (req, res) => {
     });
   }
 });
+
+
+app.post("/api/apply/:jobId", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { labourEmail } = req.body; // get email from frontend
+
+    if (!labourEmail) {
+      return res.status(400).json({ message: "Labour email is required" });
+    }
+
+    // Fetch job
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    // Check if already applied
+    const exists = await JobApplication.findOne({ jobId, labourEmail });
+    if (exists) return res.status(400).json({ message: "Already applied" });
+
+    const application = new JobApplication({
+      jobId,
+      contractorEmail: job.createdBy.email,
+      labourEmail,
+    });
+
+    await application.save();
+
+    // Update job's applicant count
+    job.noOfWorkersApplied = (job.noOfWorkersApplied || 0) + 1;
+    await job.save();
+
+    res.status(200).json({ success: true, application });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 
 
 // // ------------------- Chat Schema -------------------
