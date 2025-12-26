@@ -1985,10 +1985,8 @@ async function start() {
 
 start();
 
-// Root endpoint
-app.get("/", (req, res) => res.send("🚀 Labour Hub APIs areS running!"));
+app.get("/", (req, res) => {
+  res.send("Server is running on Vercel 🚀");
+});
 
-const port = process.env.PORT || 3000;
-app.listen(port, () =>
-  console.log(`✅ Server running at http://localhost:${port}`)
-);
+export default app;
