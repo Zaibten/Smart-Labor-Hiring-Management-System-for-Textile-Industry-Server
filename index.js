@@ -20,7 +20,7 @@ const validator = require("validator");
 const twilio = require("twilio");
 const sgMail = require("@sendgrid/mail");
 const chatRoutes = require("./chat");
-const { Server } = require("socket.io");
+// const { Server } = require("socket.io");
 require("dotenv").config();
 
 
@@ -545,14 +545,14 @@ app.use("/api/", authLimiter);
 const server = http.createServer(app);
 
 // Initialize Socket.IO
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Or your frontend URL
-    methods: ["GET", "POST"]
-  }
-});
+// const io = new Server(server, {
+//   cors: {
+//     origin: "*", // Or your frontend URL
+//     methods: ["GET", "POST"]
+//   }
+// });
 
-app.use("/api/chat", chatRoutes);
+// app.use("/api/chat", chatRoutes);
 
 /* ---------- Mongoose user schema ---------- */
 const userSchema = new mongoose.Schema(
