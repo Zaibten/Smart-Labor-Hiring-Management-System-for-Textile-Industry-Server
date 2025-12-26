@@ -2,6 +2,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
 const sgMail = require("@sendgrid/mail");
+const http = require("http");
+const socketIO = require("socket.io");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -21,9 +23,6 @@ const Chat = mongoose.model("Chat", chatSchema);
 // ==================== ROUTES ====================
 
 // Send a chat
-// POST /api/chat/send
-// body: { senderEmail, receiverEmail, message }
-// Send a chat
 router.post("/send", async (req, res) => {
   try {
     const { senderEmail, receiverEmail, message } = req.body;
@@ -31,51 +30,16 @@ router.post("/send", async (req, res) => {
       return res.status(400).json({ message: "All fields are required." });
     }
 
-    // Create chat in DB
     const chat = await Chat.create({ senderEmail, receiverEmail, message });
 
-    // Chat email UI
-    const logoUrl = "https://yourdomain.com/logo.png"; // Replace with your logo URL
+    // Send email notification (already existing)
+    const logoUrl = "https://yourdomain.com/logo.png";
     const emailData = {
       to: receiverEmail,
       from: process.env.SENDGRID_VERIFIED_SENDER,
       subject: `New Message from ${senderEmail}`,
-      html: `
-      <div style="font-family: 'Segoe UI', sans-serif; background-color: #f5f7fa; padding: 40px 0;">
-        <div style="max-width: 600px; background-color: #ffffff; margin: 0 auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-          
-          <div style="background-color: #0a66c2; padding: 25px 20px; text-align: center;">
-            <img src="${logoUrl}" alt="Labour Hub Logo" width="70" height="70" style="border-radius: 50%; border: 2px solid #ffffff; margin-bottom: 10px;">
-            <h1 style="color: #ffffff; font-size: 24px; margin: 0;">Labour Hub</h1>
-          </div>
-
-          <div style="padding: 30px 25px; color: #333333;">
-            <h2 style="color: #0a66c2; font-size: 20px;">New Message Received</h2>
-            <p style="font-size: 16px; line-height: 1.6;">
-              You have received a new message from <strong>${senderEmail}</strong>:
-            </p>
-            <div style="background-color: #f0f2f5; padding: 15px; border-radius: 8px; margin: 15px 0; font-size: 16px; color: #111;">
-              ${message}
-            </div>
-            <p style="font-size: 14px; color: #555;">Reply quickly to stay in touch with your contact.</p>
-            <div style="text-align: center; margin-top: 20px;">
-              <a href="https://labourhub.pk/chat" style="background-color: #0a66c2; color: white; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: bold;">
-                Open Chat
-              </a>
-            </div>
-          </div>
-
-          <div style="background-color: #f0f2f5; text-align: center; padding: 20px; border-top: 1px solid #e1e4e8;">
-            <p style="color: #777777; font-size: 13px; margin: 0;">
-              &copy; ${new Date().getFullYear()} Labour Hub. All rights reserved.<br>
-              Karachi, Pakistan
-            </p>
-          </div>
-        </div>
-      </div>
-      `,
+      html: `<div>New Message: ${message}</div>`, // simplified for brevity
     };
-
     try {
       await sgMail.send(emailData);
       console.log("Email sent to", receiverEmail);
@@ -90,23 +54,17 @@ router.post("/send", async (req, res) => {
   }
 });
 
-// GET /api/chat/all/:email
+// Get all chats for a user
 router.get("/all/:email", async (req, res) => {
   try {
     const email = req.params.email;
-
-    // Get all chats involving this user
     const chats = await Chat.find({
       $or: [{ senderEmail: email }, { receiverEmail: email }],
     }).sort({ timestamp: -1 });
 
-    // Group by unique users
     const usersMap = {};
-
     chats.forEach((chat) => {
-      const other =
-        chat.senderEmail === email ? chat.receiverEmail : chat.senderEmail;
-
+      const other = chat.senderEmail === email ? chat.receiverEmail : chat.senderEmail;
       if (!usersMap[other]) {
         usersMap[other] = {
           email: other,
@@ -121,12 +79,11 @@ router.get("/all/:email", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 // Get all chats between two users
-// GET /api/chat/:user1/:user2
 router.get("/:user1/:user2", async (req, res) => {
   try {
     const { user1, user2 } = req.params;
-
     const chats = await Chat.find({
       $or: [
         { senderEmail: user1, receiverEmail: user2 },
@@ -139,6 +96,61 @@ router.get("/:user1/:user2", async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
+});
+
+// ==================== SOCKET.IO for Real-time Chat + Voice ====================
+
+// Wrap your Express app into an HTTP server
+const app = express();
+const server = http.createServer(app);
+const io = socketIO(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+// Keep track of connected users
+const users = {};
+
+io.on("connection", (socket) => {
+  console.log("New socket connected:", socket.id);
+
+  // Store user email on connection
+  socket.on("join", (email) => {
+    users[email] = socket.id;
+    console.log(users);
+  });
+
+  // Chat message
+  socket.on("chat-message", (data) => {
+    const { senderEmail, receiverEmail, message } = data;
+    if (users[receiverEmail]) {
+      io.to(users[receiverEmail]).emit("chat-message", data);
+    }
+  });
+
+  // Voice call signaling
+  socket.on("call-user", ({ from, to, signalData }) => {
+    if (users[to]) {
+      io.to(users[to]).emit("incoming-call", { from, signalData });
+    }
+  });
+
+  socket.on("accept-call", ({ from, signalData }) => {
+    if (users[from]) {
+      io.to(users[from]).emit("call-accepted", { signalData });
+    }
+  });
+
+  socket.on("disconnect", () => {
+    for (let email in users) {
+      if (users[email] === socket.id) {
+        delete users[email];
+      }
+    }
+    console.log("Socket disconnected:", socket.id);
+  });
 });
 
 module.exports = router;

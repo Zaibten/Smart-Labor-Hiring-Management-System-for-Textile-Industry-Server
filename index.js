@@ -1959,6 +1959,293 @@ app.get('/api/industries/profile', async (req, res) => {
   }
 })
 
+
+
+
+
+app.post("/api/admin/industry-toggle/:id", async (req, res) => {
+  try {
+    const industry = await Industry.findById(req.params.id);
+    if (!industry) return res.status(404).json({ error: "Industry not found" });
+
+    industry.active = !industry.active;
+    await industry.save();
+
+    // redirect back to admin panel
+    res.redirect("/api/admin");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server error");
+  }
+});
+
+
+
+app.get("/api/admin", async (req, res) => {
+  try {
+    const users = await User.find().lean();
+    const jobs = await Job.find().lean();
+    const applications = await JobApplication.find().lean();
+    const industries = await Industry.find().lean();
+    const borrows = await Borrow.find().lean();
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Labour Hub | Admin Panel</title>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f6f9;
+      padding: 20px;
+    }
+    h1 {
+      color: #0a66c2;
+      margin-bottom: 10px;
+    }
+    h2 {
+      margin-top: 40px;
+      color: #111827;
+      border-left: 6px solid #0a66c2;
+      padding-left: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      background: #ffffff;
+      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+      text-align: left;
+    }
+    th {
+      background: #0a66c2;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    tr:nth-child(even) {
+      background: #f9fafb;
+    }
+    tr:hover {
+      background: #eef2ff;
+    }
+      .toggle-btn {
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+}
+
+.toggle-btn.green { background: #16a34a; }
+.toggle-btn.red { background: #dc2626; }
+
+.toggle-btn:hover {
+  opacity: 0.9;
+}
+
+    .badge {
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: white;
+    }
+    .green { background: #16a34a; }
+    .red { background: #dc2626; }
+    .blue { background: #2563eb; }
+    .gray { background: #6b7280; }
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>📊 Labour Hub – Admin Panel</h1>
+
+<!-- USERS -->
+<h2>👤 Users</h2>
+<table>
+<tr>
+  <th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Skills</th><th>Created</th>
+</tr>
+${users.map(u => `
+<tr>
+  <td>${u.firstName} ${u.lastName}</td>
+  <td>${u.email}</td>
+  <td>${u.phone}</td>
+  <td><span class="badge blue">${u.role}</span></td>
+  <td>${u.skills?.join(", ") || "-"}</td>
+  <td>${new Date(u.createdAt).toLocaleString()}</td>
+</tr>`).join("")}
+</table>
+
+<!-- JOBS -->
+<h2>🛠 Jobs</h2>
+<table>
+<tr>
+  <th>Title</th><th>Location</th><th>Skill</th><th>Budget</th>
+  <th>Workers</th><th>Applicants</th><th>Posted By</th>
+</tr>
+${jobs.map(j => `
+<tr>
+  <td>${j.title}</td>
+  <td>${j.location}</td>
+  <td>${j.skill}</td>
+  <td>${j.budget}</td>
+  <td>${j.workersRequired}</td>
+  <td>${j.noOfWorkersApplied || 0}</td>
+  <td>${j.createdBy?.email || "-"}</td>
+</tr>`).join("")}
+</table>
+
+<!-- JOB APPLICATIONS -->
+<h2>📄 Job Applications</h2>
+<table>
+<tr>
+  <th>Job ID</th><th>Contractor</th><th>Labour</th><th>Date</th>
+</tr>
+${applications.map(a => `
+<tr>
+  <td>${a.jobId}</td>
+  <td>${a.contractorEmail}</td>
+  <td>${a.labourEmail}</td>
+  <td>${new Date(a.appliedAt).toLocaleString()}</td>
+</tr>`).join("")}
+</table>
+<!-- INDUSTRIES -->
+<h2>🏭 Industries</h2>
+<table>
+<tr>
+  <th>Industry</th>
+  <th>Owner</th>
+  <th>Email</th>
+  <th>Phone</th>
+  <th>Textile</th>
+  <th>Status (Click)</th>
+</tr>
+
+${industries.map(i => `
+<tr>
+  <td>${i.industry}</td>
+  <td>${i.owner}</td>
+  <td>${i.email}</td>
+  <td>${i.phone}</td>
+  <td>${i.textileType}</td>
+  <td>
+<td>
+  <form
+    method="POST"
+    action="/api/admin/industry-toggle/${i._id}"
+    onsubmit="return confirm('${i.active
+      ? "Are you sure you want to DEACTIVATE this industry?"
+      : "Are you sure you want to ACTIVATE this industry?"}'
+    );"
+  >
+    <button
+      type="submit"
+      class="toggle-btn ${i.active ? "green" : "red"}"
+    >
+      ${i.active ? "Active" : "Inactive"}
+    </button>
+  </form>
+</td>
+
+</tr>
+`).join("")}
+
+</table>
+
+<!-- BORROW REQUESTS -->
+<h2>🔄 Borrow Requests</h2>
+<table>
+<tr>
+  <th>From</th><th>To</th><th>Labour</th><th>Skills</th>
+  <th>Location</th><th>Status</th>
+</tr>
+${borrows.map(b => `
+<tr>
+  <td>${b.fromIndustryEmail}</td>
+  <td>${b.toIndustryEmail}</td>
+  <td>${b.labourRequired}</td>
+  <td>${b.skills}</td>
+  <td>${b.location}</td>
+  <td>
+    <span class="badge ${
+      b.status === "Approved" ? "green" :
+      b.status === "Rejected" ? "red" : "gray"
+    }">${b.status}</span>
+  </td>
+</tr>`).join("")}
+</table>
+
+<footer>
+  © ${new Date().getFullYear()} Labour Hub · Admin Panel
+</footer>
+<script>
+  function toggleIndustry(id, currentStatus) {
+    const action = currentStatus ? "deactivate" : "activate";
+
+    if (!confirm("Are you sure you want to " + action + " this industry?")) {
+      return;
+    }
+
+    fetch(window.location.origin + "/api/admin/industry-toggle/" + id, {
+      method: "POST"
+    })
+    .then(res => {
+      if (!res.ok) throw new Error("Request failed");
+      return res.json();
+    })
+    .then(data => {
+      alert("Industry is now " + (data.active ? "Active" : "Inactive"));
+      location.reload();
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Failed to update industry status");
+    });
+  }
+</script>
+
+</body>
+</html>
+`;
+
+    res.send(html);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server Error");
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* ---------- DB connect & server start ---------- */
 async function start() {
   if (!process.env.MONGO_URI) {
