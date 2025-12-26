@@ -575,6 +575,84 @@ const userSchema = new mongoose.Schema(
 
 const User = mongoose.model("User", userSchema);
 
+app.post("/api/update-profile-image", upload.single("image"), async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: "Email is required" });
+  if (!req.file) return res.status(400).json({ message: "No image uploaded" });
+
+  try {
+    // Use full URL to serve image
+    const imageUrl = `http://172.23.212.221:3000/${req.file.path.replace("\\", "/")}`;
+    const user = await User.findOneAndUpdate({ email }, { image: imageUrl }, { new: true });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    return res.status(200).json({ message: "Profile image updated", user });
+  } catch (err) {
+    console.log("Server error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+
+
+
+app.get("/api/users", async (req, res) => {
+  try {
+    const { skill, role, q } = req.query;
+
+    let filter = {};
+
+    // 🔎 Search by skill (case-insensitive)
+    if (skill) {
+      filter.skills = { $regex: skill, $options: "i" };
+    }
+
+    // 🔎 Filter by role
+    if (role) {
+      filter.role = role;
+    }
+
+    // 🔎 Search by name
+    if (q) {
+      filter.$or = [
+        { firstName: { $regex: q, $options: "i" } },
+        { lastName: { $regex: q, $options: "i" } },
+      ];
+    }
+
+    const users = await User.find(filter).select(
+      "firstName lastName email phone role image skills"
+    );
+
+    // 🏷 Add badge dynamically
+    const formattedUsers = users.map(user => ({
+      _id: user._id,
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      phone: user.phone,
+      image: user.image,
+      skills: user.skills,
+      role: user.role,
+      badge: user.role === "Contractor" ? "🟦 Contractor" : "🟩 Labour",
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: formattedUsers.length,
+      users: formattedUsers,
+    });
+
+  } catch (error) {
+    console.error("User Fetch Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
 // ---------- Get Current User ----------
 app.get("/api/user/:userId", async (req, res) => {
   try {
@@ -1021,20 +1099,25 @@ module.exports = JobApplication;
 
 app.post("/api/jobs/apply/:jobId", async (req, res) => {
   const { jobId } = req.params;
-  const { labourId, labourEmail } = req.body; // labour info
+const { labourId, labourEmail } = req.body;
+
 
   try {
     const job = await Job.findById(jobId);
     if (!job) return res.status(404).json({ message: "Job not found" });
 
     // Check if labour already applied
-    const alreadyApplied = job.applicants.some(app => app.laborId.toString() === labourId);
+const alreadyApplied = job.applicants.some(
+  app => app.laborId && app.laborId.toString() === labourId
+);
+
     if (alreadyApplied) return res.status(400).json({ message: "Already applied" });
 
     // Add labour to job
-    job.applicants.push({ laborId: labourId });
-    job.noOfWorkersApplied = job.applicants.length;
-    await job.save();
+job.applicants.push({ laborId: labourId, appliedAt: new Date(), status: "pending" });
+job.noOfWorkersApplied = job.applicants.length;
+await job.save();
+
 
     // Save in JobApplications collection
     await JobApplication.create({
@@ -1377,6 +1460,45 @@ app.get("/api/search-jobs", async (req, res) => {
 });
 
 
+app.post("/api/apply/:jobId", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { labourEmail } = req.body; // get email from frontend
+
+    if (!labourEmail) {
+      return res.status(400).json({ message: "Labour email is required" });
+    }
+
+    // Fetch job
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    // Check if already applied
+    const exists = await JobApplication.findOne({ jobId, labourEmail });
+    if (exists) return res.status(400).json({ message: "Already applied" });
+
+    const application = new JobApplication({
+      jobId,
+      contractorEmail: job.createdBy.email,
+      labourEmail,
+    });
+
+    await application.save();
+
+    // Update job's applicant count
+    job.noOfWorkersApplied = (job.noOfWorkersApplied || 0) + 1;
+    await job.save();
+
+    res.status(200).json({ success: true, application });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+
+
 // // ------------------- Chat Schema -------------------
 // const chatSchema = new mongoose.Schema(
 //   {
@@ -1519,9 +1641,14 @@ const industrySchema = new mongoose.Schema({
   address: { type: String, required: true },
   textileType: { type: String, required: true },
   password: { type: String, required: true }, // hashed
+
+  // ✅ NEW FIELD
+  active: { type: Boolean, default: false },
+
 }, { timestamps: true })
 
 const Industry = mongoose.model('Industry', industrySchema)
+
 
 // Create Industry API
 app.post('/api/industries', async (req, res) => {
@@ -1548,7 +1675,7 @@ app.post('/api/industries', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Save to DB
+    // Save to DB (active will default to false)
     const newIndustry = await Industry.create({
       industry,
       owner,
@@ -1559,14 +1686,298 @@ app.post('/api/industries', async (req, res) => {
       password: hashedPassword
     })
 
-    res.status(201).json({ message: 'Industry registered successfully', industry: newIndustry })
+    res.status(201).json({
+      message: 'Industry registered successfully',
+      industry: newIndustry
+    })
   } catch (err) {
     console.error(err)
     res.status(500).json({ message: 'Server error' })
   }
 })
 
-// Login API
+
+// Get all active industries except current logged-in one
+app.get('/api/industries/all', async (req, res) => {
+  try {
+    const { email, search } = req.query
+
+    let query = {
+      active: true,
+      email: { $ne: email }, // exclude logged-in industry
+    }
+
+    if (search) {
+      query.industry = { $regex: search, $options: 'i' }
+    }
+
+    const industries = await Industry.find(query).select(
+      'industry email address textileType'
+    )
+
+    res.status(200).json(industries)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
+const borrowSchema = new mongoose.Schema({
+  fromIndustryEmail: { type: String, required: true },
+  toIndustryEmail: { type: String, required: true },
+
+  labourRequired: Number,
+  skills: String,
+  description: String,
+  date: String,
+  time: String,
+  location: String,
+
+  status: { type: String, default: 'Pending' },
+}, { timestamps: true })
+
+const Borrow = mongoose.model('Borrow', borrowSchema)
+
+app.post("/api/borrow", async (req, res) => {
+  try {
+    // 1️⃣ Save borrow request
+    const borrow = await Borrow.create(req.body);
+
+    res.status(201).json({
+      message: "Borrow request sent",
+      borrow,
+    });
+
+    // 2️⃣ EMAIL LOGIC (AFTER RESPONSE)
+    const {
+      toIndustryEmail,
+      fromIndustryEmail,
+      labourRequired,
+      skills,
+      description,
+      fromDate,
+      toDate,
+      shift,
+      shiftTime,
+      location,
+    } = req.body;
+
+    if (!toIndustryEmail) {
+      console.error("❌ toIndustryEmail missing");
+      return;
+    }
+
+    const msg = {
+      to: toIndustryEmail, // ✅ FIXED
+      from: process.env.SENDGRID_VERIFIED_SENDER,
+      subject: "Labour Hub - New Labour Borrow Request",
+      html: `
+      <div style="font-family: 'Segoe UI', sans-serif; background:#f5f7fa; padding:40px 0;">
+        <div style="max-width:620px; margin:auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,.12)">
+          
+          <!-- HEADER -->
+          <div style="background:linear-gradient(135deg,#0a66c2,#004182); padding:26px; text-align:center;">
+            <h1 style="color:#fff; margin:0;">Labour Hub</h1>
+            <p style="color:#dbeafe; margin-top:6px;">New Borrow Request</p>
+          </div>
+
+          <!-- BODY -->
+          <div style="padding:30px; color:#1f2937;">
+            <p>
+              You have received a <strong>new labour borrow request</strong>
+              from <strong>${fromIndustryEmail}</strong>.
+            </p>
+
+            <div style="margin-top:20px; background:#f9fafb; padding:20px; border-radius:12px; border:1px solid #e5e7eb;">
+              <table width="100%" style="font-size:14px;">
+                <tr><td>Labour Required</td><td><strong>${labourRequired}</strong></td></tr>
+                <tr><td>Skills</td><td><strong>${skills}</strong></td></tr>
+                <tr><td>Duration</td><td>${fromDate} → ${toDate}</td></tr>
+                <tr><td>Shift</td><td>${shift} (${shiftTime})</td></tr>
+                <tr><td>Location</td><td>${location}</td></tr>
+                <tr><td>Description</td><td>${description}</td></tr>
+              </table>
+            </div>
+
+            <div style="text-align:center; margin-top:30px;">
+              <a href="https://labourhub.pk/dashboard"
+                 style="background:#0a66c2; color:#fff; padding:12px 28px;
+                 border-radius:10px; text-decoration:none; font-weight:600;">
+                View Request
+              </a>
+            </div>
+          </div>
+
+          <!-- FOOTER -->
+          <div style="background:#f3f4f6; padding:18px; text-align:center; font-size:13px; color:#6b7280;">
+            © ${new Date().getFullYear()} Labour Hub · Karachi, Pakistan
+          </div>
+        </div>
+      </div>
+      `,
+    };
+
+    await sgMail.send(msg);
+    console.log("✅ Borrow request email sent to", toIndustryEmail);
+
+  } catch (err) {
+    console.error("❌ Borrow API error:", err);
+  }
+});
+
+
+
+
+// ==================== API to Get Borrow Records for Logged-in User ====================
+app.get("/api/my-borrows/:email", async (req, res) => {
+  try {
+    const userEmail = req.params.email; // Logged-in user's email
+
+    // Find all borrows where this user applied (as fromIndustryEmail)
+    const myBorrows = await Borrow.find({ fromIndustryEmail: userEmail });
+
+    if (!myBorrows.length) {
+      return res.status(404).json({ message: "No borrow records found." });
+    }
+
+    res.status(200).json(myBorrows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+// Get borrow requests sent TO the logged-in user
+app.get("/api/incoming-borrows/:email", async (req, res) => {
+  try {
+    const userEmail = req.params.email;
+
+    const incomingBorrows = await Borrow.find({ toIndustryEmail: userEmail });
+
+    if (!incomingBorrows.length) {
+      return res.status(404).json({ message: "No incoming requests." });
+    }
+
+    res.status(200).json(incomingBorrows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ==================== Approve Borrow API ====================
+app.post("/api/approve-borrow/:id", async (req, res) => {
+  try {
+    const borrowId = req.params.id;
+
+    // Find the borrow request
+    const borrow = await Borrow.findById(borrowId);
+    if (!borrow) {
+      return res.status(404).json({ message: "Borrow request not found." });
+    }
+
+    // Update status to Approved
+    borrow.status = "Approved";
+    await borrow.save();
+
+    // ✅ Attempt to send email, but don't crash if it fails
+    if (borrow.fromIndustryEmail && process.env.SENDGRID_VERIFIED_SENDER) {
+      const msg = {
+        to: borrow.fromIndustryEmail,
+        from: process.env.SENDGRID_VERIFIED_SENDER,
+        subject: "Labour Hub - Borrow Request Approved",
+        html: `
+        <div style="font-family: 'Segoe UI', sans-serif; background:#f5f7fa; padding:40px 0;">
+          <div style="max-width:620px; margin:auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,.12)">
+            <div style="background:linear-gradient(135deg,#0a66c2,#004182); padding:26px; text-align:center;">
+              <h1 style="color:#fff; margin:0;">Labour Hub</h1>
+              <p style="color:#dbeafe; margin-top:6px;">Borrow Request Approved</p>
+            </div>
+            <div style="padding:30px; color:#1f2937;">
+              <p>Your borrow request to <strong>${borrow.toIndustryEmail}</strong> has been <strong>approved</strong>.</p>
+              <div style="margin-top:20px; background:#f9fafb; padding:20px; border-radius:12px; border:1px solid #e5e7eb;">
+                <table width="100%" style="font-size:14px;">
+                  <tr><td>Labour Required</td><td><strong>${borrow.labourRequired}</strong></td></tr>
+                  <tr><td>Skills</td><td><strong>${borrow.skills}</strong></td></tr>
+                  <tr><td>Date</td><td>${borrow.date}</td></tr>
+                  <tr><td>Time</td><td>${borrow.time}</td></tr>
+                  <tr><td>Location</td><td>${borrow.location}</td></tr>
+                  <tr><td>Description</td><td>${borrow.description}</td></tr>
+                </table>
+              </div>
+            </div>
+            <div style="background:#f3f4f6; padding:18px; text-align:center; font-size:13px; color:#6b7280;">
+              © ${new Date().getFullYear()} Labour Hub · Karachi, Pakistan
+            </div>
+          </div>
+        </div>
+        `,
+      };
+
+      try {
+        await sgMail.send(msg);
+        console.log("✅ Approval email sent to", borrow.fromIndustryEmail);
+      } catch (emailErr) {
+        console.error("⚠️ Email failed to send:", emailErr.message);
+      }
+    } else {
+      console.log("⚠️ No email configured or sender missing. Skipping email.");
+    }
+
+    res.status(200).json({ message: "Borrow request approved", borrow });
+  } catch (err) {
+    console.error("❌ Approve borrow error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+
+// app.post("/api/borrow", async (req, res) => {
+//   try {
+//     const borrow = await Borrow.create(req.body);
+
+//     const {
+//       toIndustryEmail,
+//       fromIndustryEmail,
+//       labourRequired,
+//       skills,
+//       description,
+//       fromDate,
+//       toDate,
+//       shift,
+//       shiftTime,
+//       location,
+//     } = req.body;
+
+//     if (!toIndustryEmail) {
+//       return res.status(400).json({ error: "toIndustryEmail missing" });
+//     }
+
+//     const msg = {
+//       to: toIndustryEmail,
+//       from: process.env.SENDGRID_VERIFIED_SENDER, // MUST be verified
+//       subject: "Labour Hub - New Labour Borrow Request",
+//       html: `...your same html...`,
+//     };
+
+//     await sgMail.send(msg);
+
+//     console.log("✅ Borrow email sent to", toIndustryEmail);
+
+//     return res.status(201).json({
+//       message: "Borrow request sent successfully",
+//       borrow,
+//     });
+
+//   } catch (err) {
+//     console.error("❌ Borrow API error:", err.response?.body || err);
+//     return res.status(500).json({ error: "Borrow request failed" });
+//   }
+// });
+
+
 app.post('/api/industries/login', async (req, res) => {
   try {
     const { email, password } = req.body
@@ -1579,25 +1990,31 @@ app.post('/api/industries/login', async (req, res) => {
       return res.status(400).json({ message: 'Invalid email format' })
     }
 
-    // Find user
     const industry = await Industry.findOne({ email })
     if (!industry) return res.status(400).json({ message: 'Invalid credentials' })
 
-    // Compare password
     const isMatch = await bcrypt.compare(password, industry.password)
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' })
 
-    // Create JWT token (valid for 7 days)
-    const token = jwt.sign({ id: industry._id, email: industry.email }, 'YOUR_SECRET_KEY', {
-      expiresIn: '7d',
-    })
+    // ✅ Send active status
+    const token = jwt.sign(
+      { id: industry._id, email: industry.email },
+      'YOUR_SECRET_KEY',
+      { expiresIn: '7d' }
+    )
 
-    res.status(200).json({ message: 'Login successful', email: industry.email, token })
+    res.status(200).json({
+      message: 'Login successful',
+      email: industry.email,
+      token,
+      active: industry.active, // 🔥 IMPORTANT
+    })
   } catch (err) {
     console.error(err)
     res.status(500).json({ message: 'Server error' })
   }
 })
+
 
 // API to get industry profile by email
 app.get('/api/industries/profile', async (req, res) => {
@@ -1933,9 +2350,10 @@ async function start() {
 
 start();
 
-app.get("/", (req, res) => {
-  res.send("Server is running on Vercel 🚀");
-});
+// Root endpoint
+app.get("/", (req, res) => res.send("🚀 Labour Hub APIs areS running!"));
 
-export default app;
-
+const port = process.env.PORT || 3000;
+app.listen(port, () =>
+  console.log(`✅ Server running at http://localhost:${port}`)
+);
