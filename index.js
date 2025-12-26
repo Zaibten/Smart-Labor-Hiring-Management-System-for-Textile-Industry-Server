@@ -3,13 +3,13 @@ const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const fs = require("fs");
-const http = require("http");
+// const http = require("http");
 const path = require("path");
-const ffmpeg = require("fluent-ffmpeg");
-const ffmpegPath = require("ffmpeg-static");
+// const ffmpeg = require("fluent-ffmpeg");
+// const ffmpegPath = require("ffmpeg-static");
 const FormData = require("form-data");
 const fetch = require("node-fetch"); // If you get ESM issue, use v2: npm install node-fetch@2
-const OpenAI = require("openai");
+// const OpenAI = require("openai");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -17,11 +17,16 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const validator = require("validator");
-const twilio = require("twilio");
+// const twilio = require("twilio");
+const ffmpeg = require("fluent-ffmpeg");
+
 const sgMail = require("@sendgrid/mail");
 const chatRoutes = require("./chat");
 // const { Server } = require("socket.io");
-require("dotenv").config();
+// require("dotenv").config();
+export const config = {
+  runtime: "nodejs",
+};
 
 
 const app = express();
@@ -542,7 +547,7 @@ const authLimiter = rateLimit({
 app.use("/api/", authLimiter);
 
 // Create HTTP server
-const server = http.createServer(app);
+// const server = http.createServer(app);
 
 // Initialize Socket.IO
 // const io = new Server(server, {
@@ -1983,7 +1988,7 @@ async function start() {
   }
 }
 
-start();
+// start();
 
 app.get("/", (req, res) => {
   res.send("Server is running on Vercel 🚀");
