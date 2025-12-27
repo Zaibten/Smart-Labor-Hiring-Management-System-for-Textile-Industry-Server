@@ -591,7 +591,7 @@ app.post("/api/update-profile-image", upload.single("image"), async (req, res) =
 
   try {
     // Use full URL to serve image
-    const imageUrl = `http://172.23.212.221:3000/${req.file.path.replace("\\", "/")}`;
+    const imageUrl = `{req.file.path.replace("\\", "/")}`;
     const user = await User.findOneAndUpdate({ email }, { image: imageUrl }, { new: true });
 
     if (!user) return res.status(404).json({ message: "User not found" });
