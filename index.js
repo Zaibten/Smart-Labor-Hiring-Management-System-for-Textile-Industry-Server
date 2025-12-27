@@ -567,11 +567,20 @@ const userSchema = new mongoose.Schema(
       type: String, 
       default: "https://res.cloudinary.com/dh7kv5dzy/image/upload/v1762757911/Pngtree_user_profile_avatar_13369988_qdlgmg.png" 
     },
-    skills: { type: [String], default: [] }, // <-- added
+    skills: { type: [String], default: [] },
+    reviews: [
+      {
+        reviewerEmail: { type: String, required: true },
+        rating: { type: Number, required: true, min: 1, max: 5 },
+        feedback: { type: String, trim: true },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
+
 
 const User = mongoose.model("User", userSchema);
 
@@ -594,6 +603,29 @@ app.post("/api/update-profile-image", upload.single("image"), async (req, res) =
   }
 });
 
+app.post("/api/users/:email/review", async (req, res) => {
+  const { email } = req.params;
+  const { reviewerEmail, rating, feedback } = req.body;
+
+  if (!reviewerEmail || !rating) {
+    return res.status(400).json({ message: "Reviewer email and rating are required" });
+  }
+
+  try {
+    const user = await User.findOneAndUpdate(
+      { email },
+      { $push: { reviews: { reviewerEmail, rating, feedback } } },
+      { new: true }
+    );
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.status(200).json({ message: "Review added", user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 
 
@@ -1263,37 +1295,43 @@ app.get("/api/filter", async (req, res) => {
 app.get("/api/profile/:email", async (req, res) => {
   try {
     const { email } = req.params;
+
     const user = await User.findOne({ email: email.trim().toLowerCase() })
-      .select("firstName lastName role email image createdAt")
+      .select("firstName lastName role email image createdAt reviews")
       .lean();
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Default image if missing
     const DEFAULT_IMAGE =
       "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png";
     user.image = user.image?.trim() || DEFAULT_IMAGE;
+
+    // ⭐ Reviews logic
+    const reviews = user.reviews || [];
+    const totalReviews = reviews.length;
+    const averageRating =
+      totalReviews > 0
+        ? (
+            reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews
+          ).toFixed(1)
+        : 0;
 
     let jobsCreated = [];
     let jobsApplied = [];
     let totalApplicantsOnJobs = 0;
 
     if (user.role === "Contractor") {
-      // Fetch jobs posted by contractor
-      jobsCreated = await Job.find({ "createdBy.email": email })
-        .sort({ createdAt: -1 })
-        .lean();
-
-      // Count total applicants across all their jobs
-      totalApplicantsOnJobs = jobsCreated.reduce((acc, job) => acc + (job.applicants?.length || 0), 0);
-    } else if (user.role === "Labour") {
-      // Fetch jobs applied to by labour
-      const applications = await Job.find({ "applicants.laborId": user._id })
-        .sort({ createdAt: -1 })
-        .lean();
-
+      jobsCreated = await Job.find({ "createdBy.email": email }).lean();
+      totalApplicantsOnJobs = jobsCreated.reduce(
+        (acc, job) => acc + (job.applicants?.length || 0),
+        0
+      );
+    } else {
+      const applications = await Job.find({ "applicants.laborId": user._id }).lean();
       jobsApplied = applications.map(job => {
-        const applicant = job.applicants.find(a => a.laborId.toString() === user._id.toString());
+        const applicant = job.applicants.find(
+          a => a.laborId.toString() === user._id.toString()
+        );
         return {
           jobId: job._id,
           title: job.title,
@@ -1305,7 +1343,12 @@ app.get("/api/profile/:email", async (req, res) => {
     }
 
     res.json({
-      user,
+      user: {
+        ...user,
+        averageRating,
+        totalReviews,
+      },
+      reviews, // ⭐ FULL REVIEWS ARRAY
       stats: {
         totalJobsPosted: jobsCreated.length,
         totalJobsApplied: jobsApplied.length,
