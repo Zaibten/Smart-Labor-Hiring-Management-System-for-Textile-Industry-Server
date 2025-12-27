@@ -590,8 +590,8 @@ app.post("/api/update-profile-image", upload.single("image"), async (req, res) =
   if (!req.file) return res.status(400).json({ message: "No image uploaded" });
 
   try {
-    // Use full URL to serve image
-    const imageUrl = `{req.file.path.replace("\\", "/")}`;
+    // Save only Cloudinary URL
+    const imageUrl = req.file.path; // <-- keep this as is
     const user = await User.findOneAndUpdate({ email }, { image: imageUrl }, { new: true });
 
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -602,6 +602,7 @@ app.post("/api/update-profile-image", upload.single("image"), async (req, res) =
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 app.post("/api/users/:email/review", async (req, res) => {
   const { email } = req.params;
