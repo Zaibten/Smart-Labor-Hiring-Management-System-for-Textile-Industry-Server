@@ -30,7 +30,12 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: { folder: "audio_uploads", resource_type: "auto" },
 });
-const upload = multer({ storage });
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
 
 // OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -41,13 +46,6 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: "10kb" }));
 
-// small rate limiter for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // limit each IP to 10 requests per windowMs
-  message: { error: "Too many requests, please slow down." },
-});
-app.use("/api/", authLimiter);
 
 /* ---------- Mongoose user schema ---------- */
 const userSchema = new mongoose.Schema(
@@ -312,88 +310,6 @@ app.post("/api/forgot-password", async (req, res) => {
 });
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-
-// ---------------- SendGrid Setup ----------------
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
-app.post("/api/reset-password", async (req, res) => {
-  try {
-    const { email, newPassword } = req.body;
-    if (!email || !newPassword)
-      return res.status(400).json({ error: "Email and new password are required." });
-
-    const user = await User.findOne({ email: String(email).trim().toLowerCase() });
-    if (!user) return res.status(404).json({ error: "User not found." });
-
-    const isSame = await bcrypt.compare(newPassword, user.passwordHash);
-    if (isSame)
-      return res
-        .status(400)
-        .json({ error: "New password must be different from your old password." });
-
-    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
-    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
-    user.passwordHash = passwordHash;
-    await user.save();
-
-    // ---------------- Read and Encode Logo ----------------
-   const logoUrl = "https://res.cloudinary.com/dh7kv5dzy/image/upload/v1762834364/logo_je7mnb.png";
-
-
-    // ---------------- Send Email ----------------
-    try {
-const msg = {
-  to: user.email,
-  from: process.env.SENDGRID_VERIFIED_SENDER,
-  subject: "Labour Hub - Password Changed Successfully",
-  html: `
-    <div style="font-family: 'Segoe UI', sans-serif; background-color: #f5f7fa; padding: 40px 0;">
-      <div style="max-width: 600px; background-color: #ffffff; margin: 0 auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-        
-        <div style="background-color: #0a66c2; padding: 25px 20px; text-align: center;">
-          <img src="${logoUrl}" alt="Labour Hub Logo" width="70" height="70" style="border-radius: 50%; border: 2px solid #ffffff; margin-bottom: 10px;">
-          <h1 style="color: #ffffff; font-size: 24px; margin: 0;">Labour Hub</h1>
-        </div>
-
-        <div style="padding: 30px 25px; color: #333333;">
-          <h2 style="color: #0a66c2; font-size: 20px;">Password Changed Successfully</h2>
-          <p style="font-size: 16px; line-height: 1.6;">
-            Dear <strong>${user.email}</strong>,<br><br>
-            Your <strong>Labour Hub</strong> account password has been changed successfully.
-          </p>
-          <p>If this wasn't you, please contact our support team immediately.</p>
-          <div style="text-align: center; margin-top: 30px;">
-            <a href="https://labourhub.pk/login" style="background-color: #0a66c2; color: white; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: bold;">
-              Go to Login
-            </a>
-          </div>
-        </div>
-
-        <div style="background-color: #f0f2f5; text-align: center; padding: 20px; border-top: 1px solid #e1e4e8;">
-          <p style="color: #777777; font-size: 13px; margin: 0;">
-            &copy; ${new Date().getFullYear()} Labour Hub. All rights reserved.<br>
-            Karachi, Pakistan
-          </p>
-        </div>
-      </div>
-    </div>
-  `,
-};
-await sgMail.send(msg);
-
-
-      await sgMail.send(msg);
-      console.log(`✅ Email sent successfully to ${user.email}`);
-    } catch (err) {
-      console.error("Email send failed:", err.response ? err.response.body : err);
-    }
-
-    return res.status(200).json({ message: "Password reset successfully!" });
-  } catch (err) {
-    console.error("Reset Password error:", err);
-    return res.status(500).json({ error: "Internal server error." });
-  }
-});
 
 
 
@@ -1624,6 +1540,7 @@ async function start() {
 }
 
 start();
+
 app.get("/", (req, res) => {
   res.send("🚀 Labour Hub APIs are running!");
 });
@@ -1631,5 +1548,4 @@ app.get("/", (req, res) => {
 // ❌ REMOVE app.listen()
 // app.listen(port)
 
-// ✅ EXPORT app for Vercel
-export default app;
+module.exports = app;
