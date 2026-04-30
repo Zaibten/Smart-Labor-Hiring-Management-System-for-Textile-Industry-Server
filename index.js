@@ -3,19 +3,9 @@ const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const fs = require("fs");
-<<<<<<< HEAD
-const http = require("http");
-const path = require("path");
-const ffmpeg = require("fluent-ffmpeg");
-const ffmpegPath = require("ffmpeg-static");
-const FormData = require("form-data");
-const fetch = require("node-fetch"); // If you get ESM issue, use v2: npm install node-fetch@2
-=======
 const path = require("path");
 const FormData = require("form-data");
-const fetch = require("node-fetch"); // use node-fetch@2 for CommonJS
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
-const OpenAI = require("openai");
+const fetch = require("node-fetch"); // use node-fetch@2 for CommonJSconst OpenAI = require("openai");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -434,24 +424,6 @@ const findMatchingQuestion = (text) => {
   return similar;
 };
 
-app.post("/api/chat", async (req, res) => {
-  try {
-    const { message } = req.body;
-    if (!message) return res.status(400).json({ error: "Message is required" });
-
-    // Step 1: Translate user input to Urdu
-    const translation = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "آپ کا کام صرف انگریزی یا کسی بھی زبان کو اردو میں ترجمہ کرنا ہے، بغیر جواب دیے۔",
-        },
-        { role: "user", content: message },
-      ],
-    });
-
     const messageInUrdu = translation.choices[0].message.content.trim();
 
     // Step 2: Find exact or partial match
@@ -494,60 +466,6 @@ app.post("/api/chat", async (req, res) => {
 });
 
 // Transcribe route
-app.post("/api/transcribe", upload.single("file"), async (req, res) => {
-  try {
-    if (!req.file || !req.file.path)
-      return res.status(400).json({ error: "کوئی فائل اپلوڈ نہیں ہوئی" });
-
-    const cloudinaryUrl = req.file.path;
-
-    // Download audio
-    const audioResponse = await fetch(cloudinaryUrl);
-    const audioBuffer = await audioResponse.buffer();
-
-    const tempInput = path.join("/tmp", `input_${Date.now()}`);
-    const tempOutput = path.join("/tmp", `output_${Date.now()}.mp3`);
-    fs.writeFileSync(tempInput, audioBuffer);
-
-    await new Promise((resolve, reject) => {
-      ffmpeg(tempInput)
-        .setFfmpegPath(ffmpegPath)
-        .output(tempOutput)
-        .on("end", resolve)
-        .on("error", reject)
-        .run();
-    });
-
-    const fileStream = fs.createReadStream(tempOutput);
-    const form = new FormData();
-    form.append("file", fileStream);
-    form.append("model", "whisper-1");
-
-    const whisperResponse = await fetch(
-      "https://api.openai.com/v1/audio/transcriptions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          ...form.getHeaders(),
-        },
-        body: form,
-      },
-    );
-
-    const data = await whisperResponse.json();
-
-    fs.unlinkSync(tempInput);
-    fs.unlinkSync(tempOutput);
-
-    if (data.error) return res.status(500).json({ error: data.error.message });
-
-    res.json({ text: data.text || "", cloudinaryUrl });
-  } catch (err) {
-    console.error("Transcription error:", err);
-    res.status(500).json({ error: "آڈیو کو ٹیکسٹ میں تبدیل کرنے میں ناکامی" });
-  }
-});
 =======
 // SendGrid setup
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -666,20 +584,6 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
-// Create HTTP server
-const server = http.createServer(app);
-
-// Initialize Socket.IO
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Or your frontend URL
-    methods: ["GET", "POST"],
-  },
-});
-
-app.use("/api/chat", chatRoutes);
-notification.sendServerStartNotification().catch(console.error);
 
 /* ---------- Mongoose user schema ---------- */
 =======
