@@ -3,18 +3,12 @@ const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const fs = require("fs");
-<<<<<<< HEAD
 const http = require("http");
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegPath = require("ffmpeg-static");
 const FormData = require("form-data");
 const fetch = require("node-fetch"); // If you get ESM issue, use v2: npm install node-fetch@2
-=======
-const path = require("path");
-const FormData = require("form-data");
-const fetch = require("node-fetch"); // use node-fetch@2 for CommonJS
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 const OpenAI = require("openai");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
@@ -23,29 +17,15 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const validator = require("validator");
+const twilio = require("twilio");
 const sgMail = require("@sendgrid/mail");
 const chatRoutes = require("./chat");
 const { Server } = require("socket.io");
 require("dotenv").config();
-<<<<<<< HEAD
 const notification = require("./notification");
-=======
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 
 const app = express();
-
-/* ---------- Basic middlewares ---------- */
-app.use(helmet());
-app.use(cors());
-app.use(express.json({ limit: "10kb" }));
-
-// Rate limiter for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  message: { error: "Too many requests, please slow down." },
-});
-app.use("/api/", authLimiter);
+app.use(express.json());
 
 // Cloudinary config
 cloudinary.config({
@@ -54,7 +34,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Multer storage (Cloudinary)
+// Multer storage
 const storage = new CloudinaryStorage({
   cloudinary,
   params: { folder: "audio_uploads", resource_type: "auto" },
@@ -64,7 +44,6 @@ const upload = multer({ storage });
 // OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-<<<<<<< HEAD
 // Predefined questions
 const questionsData = [
   {
@@ -548,125 +527,20 @@ app.post("/api/transcribe", upload.single("file"), async (req, res) => {
     res.status(500).json({ error: "آڈیو کو ٹیکسٹ میں تبدیل کرنے میں ناکامی" });
   }
 });
-=======
-// SendGrid setup
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 
-// ==================== PREDEFINED QUESTIONS ====================
-const questionsData = [
-  { id: 1, text: "میری پروفائل کیسے بناؤں؟", response: "پروفائل بنانے کے لیے 'پروفائل' سیکشن میں جائیں، تمام معلومات بھریں اور 'سیو' پر کلک کریں۔" },
-  { id: 2, text: "میں ملازمت کے لیے کیسے درخواست دوں؟", response: "ملازمت کے لیے درخواست دینے کے لیے 'Jobs' میں جائیں، مطلوبہ نوکری منتخب کریں اور 'Apply' پر کلک کریں۔" },
-  { id: 3, text: "میرے قریب کون سے ملز میں کام ہے؟", response: "قریبی ملز دیکھنے کے لیے 'Nearby Jobs' سیکشن کھولیں اور دستیاب مواقع دیکھیں۔" },
-  { id: 4, text: "میں اپنی مہارتیں کیسے اپ ڈیٹ کروں؟", response: "مہارتیں اپ ڈیٹ کرنے کے لیے 'Skills' سیکشن میں جائیں، نئی مہارتیں شامل کریں اور 'Save' کریں۔" },
-  { id: 5, text: "کیا میں کسی ٹھیکیدار کی ٹیم میں شامل ہو سکتا ہوں؟", response: "جی ہاں، 'Contractors' میں جائیں اور ٹیم میں شامل ہونے کے لیے درخواست دیں۔" },
-  { id: 6, text: "نئی نوکریوں کے بارے میں اطلاع کیسے ملے گی؟", response: "نئی نوکریوں کی اطلاع کے لیے 'Notifications' آن کریں یا ایپ کی اپ ڈیٹس دیکھیں۔" },
-  { id: 7, text: "میں اپنی موجودگی کب تک ظاہر کروں؟", response: "موجودگی ظاہر کرنے کے لیے 'Attendance' سیکشن میں جائیں اور اپنی موجودگی اپ ڈیٹ کریں۔" },
-  { id: 8, text: "میرے کام کی تنخواہ کب ملے گی؟", response: "تنخواہ کی تاریخ 'Salary' سیکشن میں دیکھیں یا اپنے کمپنی کے شیڈول کے مطابق۔" },
-  { id: 9, text: "میں کس طرح ڈیجیٹل معاہدہ دیکھ سکتا ہوں؟", response: "ڈیجیٹل معاہدہ دیکھنے کے لیے 'Contracts' سیکشن میں جائیں اور متعلقہ معاہدہ کھولیں۔" },
-  { id: 10, text: "میں اپنی ریٹنگ کیسے دیکھ سکتا ہوں؟", response: "اپنی ریٹنگ دیکھنے کے لیے 'Profile' یا 'Ratings' سیکشن کھولیں۔" },
-  { id: 11, text: "کیا میں نوکری چھوڑنا چاہوں تو کیسے کروں؟", response: "نوکری چھوڑنے کے لیے 'Jobs' سیکشن میں جائیں اور 'Resign' آپشن استعمال کریں۔" },
-  { id: 12, text: "میں کس طرح اپنی جگہ کا پتہ درست کر سکتا ہوں؟", response: "اپنی جگہ درست کرنے کے لیے 'Settings' > 'Location' میں جائیں اور درست پتہ درج کریں۔" },
-  { id: 13, text: "میں کس طرح زیادہ قریبی ملازمت تلاش کر سکتا ہوں؟", response: "قریبی ملازمتیں تلاش کرنے کے لیے 'Nearby Jobs' سیکشن میں فلٹرز استعمال کریں۔" },
-  { id: 14, text: "میں اپنی پروفائل میں تصویریں کیسے ڈالوں؟", response: "پروفائل میں تصاویر شامل کرنے کے لیے 'Profile' > 'Edit' > 'Upload Photo' پر جائیں۔" },
-  { id: 15, text: "کیا میں کسی دوسرے مل میں بھی کام کر سکتا ہوں؟", response: "جی ہاں، 'Jobs' سیکشن میں مختلف ملز کے مواقع دیکھیں اور درخواست دیں۔" },
-  { id: 16, text: "میں اپنی دستیابی کب تبدیل کر سکتا ہوں؟", response: "اپنی دستیابی تبدیل کرنے کے لیے 'Availability' سیکشن میں جائیں اور نئی تاریخ یا وقت سیٹ کریں۔" },
-  { id: 17, text: "نوکری کے بارے میں نوٹیفکیشن کیسے آن کریں؟", response: "نوٹیفکیشن آن کرنے کے لیے 'Settings' > 'Notifications' میں جائیں اور متعلقہ آپشن آن کریں۔" },
-  { id: 18, text: "میں ٹھیکیدار کے ساتھ کیسے رابطہ کروں؟", response: "ٹھیکیدار سے رابطہ کرنے کے لیے 'Contractors' میں جائیں اور 'Contact' آپشن استعمال کریں۔" },
-  { id: 19, text: "میری کام کی ریکارڈ کیسے دیکھیں؟", response: "کام کی ریکارڈ دیکھنے کے لیے 'Work History' یا 'Attendance' سیکشن کھولیں۔" },
-  { id: 20, text: "کیا میں اپنی تنخواہ کا حساب خود دیکھ سکتا ہوں؟", response: "جی ہاں، 'Salary' سیکشن میں جائیں اور 'Salary Calculator' استعمال کریں۔" },
-  { id: 21, text: "میں نئی مہارتیں کیسے سیکھ سکتا ہوں؟", response: "نئی مہارتیں سیکھنے کے لیے 'Learning' یا 'Skills' سیکشن میں دستیاب کورسز دیکھیں۔" },
-  { id: 22, text: "میں کسی شکایت یا مسئلے کی اطلاع کیسے دوں؟", response: "شکایت یا مسئلے کی اطلاع دینے کے لیے 'Support' > 'Report Issue' استعمال کریں۔" },
-  { id: 23, text: "میں کون سے ملز کے ساتھ کام کر چکا ہوں دیکھ سکتا ہوں؟", response: "اپنے کام کیے گئے ملز دیکھنے کے لیے 'Work History' یا 'Jobs Completed' سیکشن کھولیں۔" },
-  { id: 24, text: "کیا میں کسی دوست کو بھی ایپ پر لاؤ سکتا ہوں؟", response: "جی ہاں، 'Invite Friends' آپشن استعمال کریں اور دوست کو ایپ پر مدعو کریں۔" },
-  { id: 25, text: "میں اپنے کام کی تاریخ کیسے دیکھوں؟", response: "اپنے کام کی تاریخ دیکھنے کے لیے 'Work History' یا 'Attendance' سیکشن استعمال کریں۔" },
-  { id: 26, text: "کیا میں ادائیگی کے طریقے بدل سکتا ہوں؟", response: "ادائیگی کے طریقے بدلنے کے لیے 'Settings' > 'Payment Methods' میں جائیں اور نیا طریقہ منتخب کریں۔" },
-  { id: 27, text: "میں اپنی پروفائل بند کیسے کروں؟", response: "پروفائل بند کرنے کے لیے 'Profile' > 'Settings' > 'Deactivate Account' استعمال کریں۔" },
-  { id: 28, text: "میں نئی جگہ پر کیسے کام تلاش کروں؟", response: "نئی جگہ پر کام تلاش کرنے کے لیے 'Jobs' سیکشن میں فلٹرز کے ذریعے مقام منتخب کریں۔" },
-  { id: 29, text: "میں کام کے اوقات کیسے دیکھ سکتا ہوں؟", response: "کام کے اوقات دیکھنے کے لیے 'Work Schedule' یا 'Shifts' سیکشن کھولیں۔" },
-  { id: 30, text: "میں کس طرح اپنے کام کی درجہ بندی بڑھا سکتا ہوں؟", response: "کام کی درجہ بندی بڑھانے کے لیے اچھا کام کریں، ریویوز حاصل کریں اور 'Ratings' اپ ڈیٹ کریں۔" },
-  { id: 31, text: "ایپ کو کیسے چلائیں؟", response: "ایپ کو چلانے کے لیے اسے انسٹال کریں، لاگ ان کریں اور مین مینو سے اپنے فیچرز استعمال کریں۔" },
-  { id: 32, text: "میں اپنا پاسورڈ کیسے بدل سکتا ہوں؟", response: "پاسورڈ بدلنے کے لیے 'Settings' > 'Change Password' میں جائیں۔" },
-  { id: 33, text: "میں ایپ میں نوٹیفکیشن کیسے آن کروں؟", response: "نوٹیفکیشن آن کرنے کے لیے 'Settings' > 'Notifications' میں جائیں اور مطلوبہ آپشن آن کریں۔" },
-  { id: 34, text: "میں ایپ میں نئی نوکری کیسے دیکھوں؟", response: "نئی نوکری دیکھنے کے لیے 'Jobs' سیکشن کھولیں اور فلٹرز استعمال کریں۔" },
-  { id: 35, text: "میں ایپ میں اپنی پروفائل اپ ڈیٹ کیسے کروں؟", response: "پروفائل اپ ڈیٹ کرنے کے لیے 'Profile' > 'Edit' میں جائیں اور معلومات بدلیں۔" },
-  { id: 36, text: "میں ایپ پر اپنے کام کی رپورٹ کیسے دیکھوں؟", response: "کام کی رپورٹ دیکھنے کے لیے 'Work History' یا 'Attendance' سیکشن استعمال کریں۔" },
-  { id: 37, text: "میں ایپ میں کسی ٹھیکیدار سے کیسے رابطہ کروں؟", response: "ٹھیکیدار سے رابطہ کرنے کے لیے 'Contractors' > 'Contact' استعمال کریں۔" },
-  { id: 38, text: "میں ایپ پر نوکری چھوڑنے کا طریقہ کیا ہے؟", response: "نوکری چھوڑنے کے لیے 'Jobs' میں جائیں اور 'Resign' پر کلک کریں۔" },
-  { id: 39, text: "میں ایپ میں اپنی دستیابی کیسے سیٹ کروں؟", response: "دستیابی سیٹ کرنے کے لیے 'Availability' سیکشن میں جائیں اور تاریخ یا وقت منتخب کریں۔" },
-  { id: 40, text: "میں ایپ پر تنخواہ کیسے دیکھوں؟", response: "تنخواہ دیکھنے کے لیے 'Salary' سیکشن کھولیں اور اپنے شیڈول کے مطابق معلومات دیکھیں۔" },
-  { id: 41, text: "میں ایپ میں نئی مہارتیں کیسے سیکھ سکتا ہوں؟", response: "نئی مہارتیں سیکھنے کے لیے 'Skills' یا 'Learning' سیکشن میں دستیاب کورسز دیکھیں۔" },
-  { id: 42, text: "میں ایپ پر کام کے اوقات کیسے دیکھوں؟", response: "کام کے اوقات دیکھنے کے لیے 'Work Schedule' یا 'Shifts' سیکشن استعمال کریں۔" },
-  { id: 43, text: "میں ایپ پر ادائیگی کے طریقے کیسے بدلوں؟", response: "ادائیگی کے طریقے بدلنے کے لیے 'Settings' > 'Payment Methods' میں جائیں اور نیا طریقہ منتخب کریں۔" },
-  { id: 44, text: "میں ایپ میں ریٹنگ کیسے بڑھاؤں؟", response: "ریٹنگ بڑھانے کے لیے اچھا کام کریں اور کلائنٹس سے مثبت ریویوز حاصل کریں۔" },
-  { id: 45, text: "میں ایپ پر شکایت کیسے دوں؟", response: "شکایت دینے کے لیے 'Support' > 'Report Issue' استعمال کریں۔" },
-  { id: 46, text: "میں ایپ میں کسی دوست کو کیسے مدعو کروں؟", response: "دوست کو مدعو کرنے کے لیے 'Invite Friends' آپشن استعمال کریں۔" },
-  { id: 47, text: "میں ایپ میں پرانے کام کی ریکارڈ کیسے دیکھوں؟", response: "پرانے کام دیکھنے کے لیے 'Work History' یا 'Jobs Completed' سیکشن کھولیں۔" },
-  { id: 48, text: "میں ایپ میں اپ لوڈ کی گئی تصویریں کیسے دیکھوں؟", response: "تصویریں دیکھنے کے لیے 'Profile' > 'Gallery' میں جائیں۔" },
-  { id: 49, text: "میں ایپ میں ڈیجیٹل معاہدہ کیسے دیکھوں؟", response: "ڈیجیٹل معاہدہ دیکھنے کے لیے 'Contracts' سیکشن میں جائیں اور متعلقہ معاہدہ کھولیں۔" },
-  { id: 50, text: "میں ایپ میں کس طرح ایمرجنسی مدد لے سکتا ہوں؟", response: "ایمرجنسی مدد کے لیے 'Support' > 'Emergency' استعمال کریں اور فوری رابطہ کریں۔" },
-  { id: 51, text: "میں ایپ میں نوکری کی درخواست کب تک رکھ سکتا ہوں؟", response: "نوکری کی درخواست 'Jobs' میں جا کر منتخب کریں اور 'Apply' پر کلک کریں۔" },
-  { id: 52, text: "میں ایپ میں کیسے سائن آؤٹ کروں؟", response: "سائن آؤٹ کرنے کے لیے 'Settings' > 'Logout' پر کلک کریں۔" },
-  { id: 53, text: "میں ایپ میں نوٹیفکیشن بند کیسے کروں؟", response: "نوٹیفکیشن بند کرنے کے لیے 'Settings' > 'Notifications' میں جائیں اور آف کریں۔" },
-  { id: 54, text: "میں ایپ میں پروفائل فوٹو کیسے بدلوں؟", response: "پروفائل فوٹو بدلنے کے لیے 'Profile' > 'Edit' > 'Upload Photo' استعمال کریں۔" },
-  { id: 55, text: "میں ایپ میں کام کی تفصیلات کیسے دیکھوں؟", response: "کام کی تفصیلات دیکھنے کے لیے 'Jobs' یا 'Work History' میں جائیں۔" },
-  { id: 56, text: "میں ایپ میں دستیاب جابز کیسے فلٹر کروں؟", response: "جابز فلٹر کرنے کے لیے 'Jobs' میں فلٹرز استعمال کریں جیسے مقام، وقت یا تنخواہ۔" },
-  { id: 57, text: "میں ایپ میں اپنا پروفائل کیسے ایکٹیو رکھوں؟", response: "پروفائل ایکٹیو رکھنے کے لیے تمام معلومات مکمل کریں اور 'Profile Active' آن کریں۔" },
-  { id: 58, text: "میں ایپ میں کسی ٹھیکیدار کی ٹیم میں شامل کیسے ہوں؟", response: "ٹھیکیدار کی ٹیم میں شامل ہونے کے لیے 'Contractors' میں جائیں اور درخواست دیں۔" },
-  { id: 59, text: "میں ایپ میں نئی جگہ پر کام کیسے تلاش کروں؟", response: "نئی جگہ پر کام تلاش کرنے کے لیے 'Jobs' سیکشن میں مقام منتخب کریں۔" },
-  { id: 60, text: "میں ایپ میں تربیتی کورس کیسے دیکھوں؟", response: "تربیتی کورس دیکھنے کے لیے 'Learning' یا 'Skills' سیکشن استعمال کریں۔" },
-];
+/* ---------- Basic middlewares ---------- */
+app.use(helmet());
+app.use(cors());
+app.use(express.json({ limit: "10kb" }));
 
-const findMatchingQuestion = (text) => {
-  const lowerText = text.toLowerCase();
-  const match = questionsData.find(
-    (q) => q.text.includes(lowerText) || lowerText.includes(q.text)
-  );
-  if (match) return match;
-  return questionsData.find((q) =>
-    q.text.split(" ").some((word) => lowerText.includes(word))
-  );
-};
-
-// ==================== AI CHAT ====================
-app.post("/api/chat", async (req, res) => {
-  try {
-    const { message } = req.body;
-    if (!message) return res.status(400).json({ error: "Message is required" });
-
-    const translation = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "آپ کا کام صرف انگریزی یا کسی بھی زبان کو اردو میں ترجمہ کرنا ہے، بغیر جواب دیے۔" },
-        { role: "user", content: message },
-      ],
-    });
-
-    const messageInUrdu = translation.choices[0].message.content.trim();
-    const matchedQuestion = findMatchingQuestion(messageInUrdu);
-    if (matchedQuestion) return res.json({ reply: matchedQuestion.response });
-
-    const context = questionsData.map((q) => `سوال: ${q.text} | جواب: ${q.response}`).join("\n");
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `آپ ایک AI اسسٹنٹ ہیں جو صرف "مزدور اور ٹھیکیدار" موبائل ایپ کے basic flow اور فیچرز کے مطابق جواب دیتا ہے۔\n- ہمیشہ جواب اردو میں دیں۔\n- ہر سوال کا جواب ایپ کے استعمال یا فیچرز کے تناظر میں دیں۔\n- کبھی بھی غیر متعلقہ یا عام معلومات نہ دیں۔\n\nموجودہ معلومات: ${context}`,
-        },
-        { role: "user", content: messageInUrdu },
-      ],
-    });
-
-    res.json({ reply: response.choices[0].message.content });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "سرور میں خرابی پیش آگئی" });
-  }
+// small rate limiter for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // limit each IP to 10 requests per windowMs
+  message: { error: "Too many requests, please slow down." },
 });
+app.use("/api/", authLimiter);
 
-<<<<<<< HEAD
 // Create HTTP server
 const server = http.createServer(app);
 
@@ -682,50 +556,6 @@ app.use("/api/chat", chatRoutes);
 notification.sendServerStartNotification().catch(console.error);
 
 /* ---------- Mongoose user schema ---------- */
-=======
-// ==================== AUDIO TRANSCRIBE ====================
-// NOTE: ffmpeg is NOT used here — Whisper API accepts the audio directly from Cloudinary URL.
-app.post("/api/transcribe", upload.single("file"), async (req, res) => {
-  try {
-    if (!req.file || !req.file.path)
-      return res.status(400).json({ error: "کوئی فائل اپلوڈ نہیں ہوئی" });
-
-    const cloudinaryUrl = req.file.path;
-
-    // Download audio from Cloudinary
-    const audioResponse = await fetch(cloudinaryUrl);
-    const audioBuffer = await audioResponse.buffer();
-
-    // Write to /tmp (Vercel allows temp writes during function execution)
-    const tempOutput = path.join("/tmp", `audio_${Date.now()}.mp3`);
-    fs.writeFileSync(tempOutput, audioBuffer);
-
-    const form = new FormData();
-    form.append("file", fs.createReadStream(tempOutput), { filename: "audio.mp3" });
-    form.append("model", "whisper-1");
-
-    const whisperResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        ...form.getHeaders(),
-      },
-      body: form,
-    });
-
-    const data = await whisperResponse.json();
-    fs.unlinkSync(tempOutput);
-
-    if (data.error) return res.status(500).json({ error: data.error.message });
-    res.json({ text: data.text || "", cloudinaryUrl });
-  } catch (err) {
-    console.error("Transcription error:", err);
-    res.status(500).json({ error: "آڈیو کو ٹیکسٹ میں تبدیل کرنے میں ناکامی" });
-  }
-});
-
-// ==================== USER SCHEMA ====================
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 const userSchema = new mongoose.Schema(
   {
     firstName: { type: String, required: true, trim: true, maxlength: 50 },
@@ -742,12 +572,8 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ["Labour", "Contractor"], default: "Labour" },
     image: {
       type: String,
-<<<<<<< HEAD
       default:
         "https://res.cloudinary.com/dh7kv5dzy/image/upload/v1762757911/Pngtree_user_profile_avatar_13369988_qdlgmg.png",
-=======
-      default: "https://res.cloudinary.com/dh7kv5dzy/image/upload/v1762757911/Pngtree_user_profile_avatar_13369988_qdlgmg.png",
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     },
     skills: { type: [String], default: [] },
     expoPushToken: { type: String, default: null }, // ADD THIS LINE
@@ -766,7 +592,6 @@ const userSchema = new mongoose.Schema(
 
 const User = mongoose.model("User", userSchema);
 
-<<<<<<< HEAD
 app.post(
   "/api/update-profile-image",
   upload.single("image"),
@@ -805,38 +630,18 @@ app.post("/api/users/:email/review", async (req, res) => {
       .json({ message: "Reviewer email and rating are required" });
   }
 
-=======
-// ==================== USER ROUTES ====================
-
-app.post("/api/update-profile-image", upload.single("image"), async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ message: "Email is required" });
-  if (!req.file) return res.status(400).json({ message: "No image uploaded" });
-  try {
-    const imageUrl = req.file.path;
-    const user = await User.findOneAndUpdate({ email }, { image: imageUrl }, { new: true });
-    if (!user) return res.status(404).json({ message: "User not found" });
-    return res.status(200).json({ message: "Profile image updated", user });
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-app.post("/api/users/:email/review", async (req, res) => {
-  const { email } = req.params;
-  const { reviewerEmail, rating, feedback } = req.body;
-  if (!reviewerEmail || !rating)
-    return res.status(400).json({ message: "Reviewer email and rating are required" });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
   try {
     const user = await User.findOneAndUpdate(
       { email },
       { $push: { reviews: { reviewerEmail, rating, feedback } } },
       { new: true },
     );
+
     if (!user) return res.status(404).json({ message: "User not found" });
+
     res.status(200).json({ message: "Review added", user });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -844,15 +649,9 @@ app.post("/api/users/:email/review", async (req, res) => {
 app.get("/api/users", async (req, res) => {
   try {
     const { skill, role, q } = req.query;
-    let filter = {};
-    if (skill) filter.skills = { $regex: skill, $options: "i" };
-    if (role) filter.role = role;
-    if (q) filter.$or = [
-      { firstName: { $regex: q, $options: "i" } },
-      { lastName: { $regex: q, $options: "i" } },
-    ];
 
-<<<<<<< HEAD
+    let filter = {};
+
     // 🔎 Search by skill (case-insensitive)
     if (skill) {
       filter.skills = { $regex: skill, $options: "i" };
@@ -876,9 +675,6 @@ app.get("/api/users", async (req, res) => {
     );
 
     // 🏷 Add badge dynamically
-=======
-    const users = await User.find(filter).select("firstName lastName email phone role image skills");
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     const formattedUsers = users.map((user) => ({
       _id: user._id,
       name: `${user.firstName} ${user.lastName}`,
@@ -889,21 +685,22 @@ app.get("/api/users", async (req, res) => {
       role: user.role,
       badge: user.role === "Contractor" ? "🟦 Contractor" : "🟩 Labour",
     }));
-<<<<<<< HEAD
 
     res.status(200).json({
       success: true,
       count: formattedUsers.length,
       users: formattedUsers,
     });
-=======
-    res.status(200).json({ success: true, count: formattedUsers.length, users: formattedUsers });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("User Fetch Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 
+// ---------- Get Current User ----------
 app.get("/api/user/:userId", async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
@@ -914,15 +711,12 @@ app.get("/api/user/:userId", async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 // ---------- Get Skills by Email ----------
-=======
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 app.get("/api/user/skills/:email", async (req, res) => {
   try {
     const email = req.params.email.toLowerCase().trim();
+
     const user = await User.findOne({ email });
-<<<<<<< HEAD
 
     if (!user) {
       return res
@@ -935,24 +729,20 @@ app.get("/api/user/skills/:email", async (req, res) => {
       email: user.email,
       skills: user.skills || [],
     });
-=======
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
-    return res.json({ success: true, email: user.email, skills: user.skills || [] });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
   } catch (err) {
-    res.status(500).json({ success: false, message: "Server error while fetching skills" });
+    console.error("Error fetching skills:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching skills",
+    });
   }
 });
 
-<<<<<<< HEAD
 // ---------- Add Skill ----------
-=======
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 app.post("/api/user/:email/skills", async (req, res) => {
   try {
     const email = req.params.email.toLowerCase().trim();
     const { skill } = req.body;
-<<<<<<< HEAD
 
     if (!skill || !skill.trim()) {
       return res
@@ -990,25 +780,10 @@ app.post("/api/user/:email/skills", async (req, res) => {
 });
 
 // ---------- Delete Skill ----------
-=======
-    if (!skill || !skill.trim()) return res.status(400).json({ success: false, message: "Skill is required" });
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
-    if (user.skills.includes(skill.trim())) return res.json({ success: true, message: "Skill already exists" });
-    user.skills.push(skill.trim());
-    await user.save();
-    return res.json({ success: true, message: "Skill added successfully", skills: user.skills });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Server error while adding skill" });
-  }
-});
-
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 app.delete("/api/user/:email/skills/:index", async (req, res) => {
   try {
     const email = req.params.email.toLowerCase().trim();
     const index = parseInt(req.params.index);
-<<<<<<< HEAD
 
     const user = await User.findOne({ email });
 
@@ -1038,37 +813,24 @@ app.delete("/api/user/:email/skills/:index", async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Server error while deleting skill" });
-=======
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
-    if (index < 0 || index >= user.skills.length) return res.status(400).json({ success: false, message: "Invalid skill index" });
-    user.skills.splice(index, 1);
-    await user.save();
-    return res.json({ success: true, message: "Skill deleted successfully", skills: user.skills });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Server error while deleting skill" });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
   }
 });
 
+// Get user by email
 app.get("/api/user-by-email/:email", async (req, res) => {
   try {
-<<<<<<< HEAD
     const { email } = req.params;
     const user = await User.findOne({ email }).select(
       "firstName lastName email image role",
     );
-=======
-    const user = await User.findOne({ email: req.params.email }).select("firstName lastName email image role");
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-<<<<<<< HEAD
 /* ---------- Helpers ---------- */
 
 function validateSignupPayload(payload) {
@@ -1098,25 +860,12 @@ function validateSignupPayload(payload) {
     errors.push("Role must be either 'Labour' or 'Contractor'.");
   }
 
-=======
-// ==================== AUTH HELPERS ====================
-
-function validateSignupPayload(payload) {
-  const errors = [];
-  if (!payload.firstName || String(payload.firstName).trim().length < 2) errors.push("First name is required (min 2 characters).");
-  if (!payload.lastName || String(payload.lastName).trim().length < 1) errors.push("Last name is required.");
-  if (!payload.phone || !/^\+?[0-9]{7,15}$/.test(String(payload.phone).trim())) errors.push("Phone is required (digits only, 7-15 chars, optional leading +).");
-  if (!payload.email || !validator.isEmail(String(payload.email))) errors.push("A valid email is required.");
-  if (!payload.password || String(payload.password).length < 6) errors.push("Password is required (min 6 characters).");
-  if (!payload.role || !["Labour", "Contractor"].includes(payload.role)) errors.push("Role must be either 'Labour' or 'Contractor'.");
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
   return errors;
 }
 
 function signJwt(user) {
   const secret = process.env.JWT_SECRET;
   const expiresIn = process.env.JWT_EXPIRES_IN || "7d";
-<<<<<<< HEAD
   return jwt.sign(
     { sub: user._id.toString(), email: user.email, role: user.role },
     secret,
@@ -1286,105 +1035,25 @@ app.post("/api/forgot-password", async (req, res) => {
       .json({ message: "User found. Proceed to reset password." });
   } catch (err) {
     console.error("Forgot Password error:", err);
-=======
-  return jwt.sign({ sub: user._id.toString(), email: user.email, role: user.role }, secret, { expiresIn });
-}
-
-// ==================== AUTH ROUTES ====================
-
-app.post("/api/signup", async (req, res) => {
-  try {
-    const { firstName, lastName, phone, email, password, role } = req.body || {};
-    const validationErrors = validateSignupPayload({ firstName, lastName, phone, email, password, role });
-    if (validationErrors.length) return res.status(400).json({ errors: validationErrors });
-
-    const normalizedEmail = String(email).trim().toLowerCase();
-    const existing = await User.findOne({ email: normalizedEmail }).lean();
-    if (existing) return res.status(409).json({ error: "Email already in use." });
-
-    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-
-    const user = new User({
-      firstName: String(firstName).trim(),
-      lastName: String(lastName).trim(),
-      phone: String(phone).trim(),
-      email: normalizedEmail,
-      passwordHash,
-      role,
-    });
-    await user.save();
-
-    const token = signJwt(user);
-    return res.status(201).json({
-      user: { id: user._id, firstName: user.firstName, lastName: user.lastName, phone: user.phone, email: user.email, role: user.role, createdAt: user.createdAt },
-      token,
-    });
-  } catch (err) {
-    console.error("Signup error:", err);
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     return res.status(500).json({ error: "Internal server error." });
   }
 });
 
-<<<<<<< HEAD
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN,
 );
-=======
-app.post("/api/login", async (req, res) => {
-  try {
-    const { email, password } = req.body || {};
-    if (!email || !password) return res.status(400).json({ error: "Email and password required." });
-    const user = await User.findOne({ email: String(email).trim().toLowerCase() });
-    if (!user) return res.status(401).json({ error: "Invalid credentials." });
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ error: "Invalid credentials." });
-    const token = signJwt(user);
-    return res.json({ user: { id: user._id, firstName: user.firstName, lastName: user.lastName, email: user.email, phone: user.phone, role: user.role }, token });
-  } catch (err) {
-    return res.status(500).json({ error: "Internal server error." });
-  }
-});
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 
-app.get("/api/me", async (req, res) => {
-  try {
-    const auth = req.headers.authorization;
-    if (!auth || !auth.startsWith("Bearer ")) return res.status(401).json({ error: "Missing token." });
-    const decoded = jwt.verify(auth.slice(7), process.env.JWT_SECRET);
-    const user = await User.findById(decoded.sub).lean();
-    if (!user) return res.status(404).json({ error: "User not found." });
-    return res.json({ user: { id: user._id, email: user.email, firstName: user.firstName, role: user.role } });
-  } catch (err) {
-    return res.status(401).json({ error: "Invalid or expired token." });
-  }
-});
-
-app.post("/api/forgot-password", async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: "Email is required." });
-    const user = await User.findOne({ email: String(email).trim().toLowerCase() });
-    if (!user) return res.status(404).json({ error: "No account found with this email." });
-    return res.status(200).json({ message: "User found. Proceed to reset password." });
-  } catch (err) {
-    return res.status(500).json({ error: "Internal server error." });
-  }
-});
+// ---------------- SendGrid Setup ----------------
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 app.post("/api/reset-password", async (req, res) => {
   try {
     const { email, newPassword } = req.body;
-<<<<<<< HEAD
     if (!email || !newPassword)
       return res
         .status(400)
         .json({ error: "Email and new password are required." });
-=======
-    if (!email || !newPassword) return res.status(400).json({ error: "Email and new password are required." });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 
     const user = await User.findOne({
       email: String(email).trim().toLowerCase(),
@@ -1392,20 +1061,16 @@ app.post("/api/reset-password", async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found." });
 
     const isSame = await bcrypt.compare(newPassword, user.passwordHash);
-<<<<<<< HEAD
     if (isSame)
       return res.status(400).json({
         error: "New password must be different from your old password.",
       });
-=======
-    if (isSame) return res.status(400).json({ error: "New password must be different from your old password." });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 
     const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
-    user.passwordHash = await bcrypt.hash(newPassword, saltRounds);
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+    user.passwordHash = passwordHash;
     await user.save();
 
-<<<<<<< HEAD
     // ---------------- Read and Encode Logo ----------------
     const logoUrl =
       "https://res.cloudinary.com/dh7kv5dzy/image/upload/v1762834364/logo_je7mnb.png";
@@ -1413,16 +1078,10 @@ app.post("/api/reset-password", async (req, res) => {
     // ---------------- Send Email ----------------
     try {
       const msg = {
-=======
-    const logoUrl = "https://res.cloudinary.com/dh7kv5dzy/image/upload/v1762834364/logo_je7mnb.png";
-    try {
-      await sgMail.send({
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
         to: user.email,
         from: process.env.SENDGRID_VERIFIED_SENDER,
         subject: "Labour Hub - Password Changed Successfully",
         html: `
-<<<<<<< HEAD
     <div style="font-family: 'Segoe UI', sans-serif; background-color: #f5f7fa; padding: 40px 0;">
       <div style="max-width: 600px; background-color: #ffffff; margin: 0 auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
         
@@ -1464,68 +1123,40 @@ app.post("/api/reset-password", async (req, res) => {
         "Email send failed:",
         err.response ? err.response.body : err,
       );
-=======
-          <div style="font-family:'Segoe UI',sans-serif;background:#f5f7fa;padding:40px 0;">
-            <div style="max-width:600px;background:#fff;margin:0 auto;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.1);">
-              <div style="background:#0a66c2;padding:25px 20px;text-align:center;">
-                <img src="${logoUrl}" alt="Labour Hub" width="70" height="70" style="border-radius:50%;border:2px solid #fff;margin-bottom:10px;">
-                <h1 style="color:#fff;font-size:24px;margin:0;">Labour Hub</h1>
-              </div>
-              <div style="padding:30px 25px;color:#333;">
-                <h2 style="color:#0a66c2;">Password Changed Successfully</h2>
-                <p>Dear <strong>${user.email}</strong>,<br><br>Your Labour Hub account password has been changed successfully.</p>
-                <p>If this wasn't you, please contact our support team immediately.</p>
-                <div style="text-align:center;margin-top:30px;">
-                  <a href="https://labourhub.pk/login" style="background:#0a66c2;color:#fff;text-decoration:none;padding:12px 25px;border-radius:8px;font-weight:bold;">Go to Login</a>
-                </div>
-              </div>
-              <div style="background:#f0f2f5;text-align:center;padding:20px;border-top:1px solid #e1e4e8;">
-                <p style="color:#777;font-size:13px;margin:0;">&copy; ${new Date().getFullYear()} Labour Hub. All rights reserved.<br>Karachi, Pakistan</p>
-              </div>
-            </div>
-          </div>`,
-      });
-    } catch (emailErr) {
-      console.error("Email send failed:", emailErr.response ? emailErr.response.body : emailErr);
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     }
+
     return res.status(200).json({ message: "Password reset successfully!" });
   } catch (err) {
+    console.error("Reset Password error:", err);
     return res.status(500).json({ error: "Internal server error." });
   }
 });
 
-<<<<<<< HEAD
 const DEFAULT_IMAGE =
   "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png";
-=======
-const DEFAULT_IMAGE = "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png";
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 
+// API to get user by ID
 app.get("/api/user/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select(
       "firstName lastName role email image",
     );
     if (!user) return res.status(404).json({ message: "User not found" });
+
     res.json({
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       role: user.role || "",
       email: user.email || "",
-<<<<<<< HEAD
       image:
         user.image && user.image.trim() !== "" ? user.image : DEFAULT_IMAGE,
-=======
-      image: user.image?.trim() || DEFAULT_IMAGE,
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-<<<<<<< HEAD
 // ==================== SCHEMA ====================
 const jobSchema = new mongoose.Schema(
   {
@@ -1564,38 +1195,6 @@ const jobSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
-=======
-// ==================== JOB SCHEMA ====================
-const jobSchema = new mongoose.Schema({
-  title: String,
-  description: String,
-  location: String,
-  workersRequired: Number,
-  skill: String,
-  budget: Number,
-  contact: String,
-  startDate: Date,
-  endDate: Date,
-  shift: { type: String, default: "Shift A" },
-  jobTime: { type: Date, default: Date.now },
-  createdBy: {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    firstName: String,
-    lastName: String,
-    role: String,
-    email: String,
-  },
-  applicants: [
-    {
-      laborId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-      appliedAt: { type: Date, default: Date.now },
-      status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
-      chatId: { type: mongoose.Schema.Types.ObjectId, ref: "Chat" },
-    },
-  ],
-  noOfWorkersApplied: { type: Number, default: 0 },
-}, { timestamps: true });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 
 const Job = mongoose.model("Job", jobSchema);
 
@@ -1607,8 +1206,8 @@ const jobApplicationSchema = new mongoose.Schema({
 });
 
 const JobApplication = mongoose.model("JobApplication", jobApplicationSchema);
+module.exports = JobApplication;
 
-<<<<<<< HEAD
 app.post("/api/jobs/apply/:jobId", async (req, res) => {
   const { jobId } = req.params;
   const { labourId, labourEmail } = req.body;
@@ -1641,31 +1240,17 @@ app.post("/api/jobs/apply/:jobId", async (req, res) => {
       labourEmail,
     });
 
-=======
-// ==================== JOB ROUTES ====================
-
-app.post("/api/jobs/apply/:jobId", async (req, res) => {
-  const { jobId } = req.params;
-  const { labourId, labourEmail } = req.body;
-  try {
-    const job = await Job.findById(jobId);
-    if (!job) return res.status(404).json({ message: "Job not found" });
-    const alreadyApplied = job.applicants.some((app) => app.laborId && app.laborId.toString() === labourId);
-    if (alreadyApplied) return res.status(400).json({ message: "Already applied" });
-    job.applicants.push({ laborId: labourId, appliedAt: new Date(), status: "pending" });
-    job.noOfWorkersApplied = job.applicants.length;
-    await job.save();
-    await JobApplication.create({ jobId: job._id, contractorEmail: job.createdBy.email, labourEmail });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     res.status(200).json({ message: "Applied successfully", job });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server Error" });
   }
 });
 
+// ==================== ROUTE ====================
+// Create a new job
 app.post("/api/jobs", async (req, res) => {
   try {
-<<<<<<< HEAD
     const {
       title,
       description,
@@ -1716,12 +1301,6 @@ app.post("/api/jobs", async (req, res) => {
       },
     });
 
-=======
-    const { title, description, location, workersRequired, skill, budget, contact, startDate, endDate, createdBy } = req.body;
-    if (!title || !description || !location || !workersRequired || !skill || !budget || !contact || !startDate || !endDate)
-      return res.status(400).json({ message: "All fields are required." });
-    const job = new Job({ title, description, location, workersRequired, skill, budget, contact, startDate, endDate, createdBy });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     await job.save();
 
     // ============================================
@@ -1762,6 +1341,7 @@ app.post("/api/jobs", async (req, res) => {
       notificationsSent: notificationResult.successCount,
     });
   } catch (err) {
+    console.error("Error creating job:", err);
     return res.status(500).json({ message: "Server error" });
   }
 });
@@ -1770,7 +1350,6 @@ app.post("/api/update-push-token", async (req, res) => {
   try {
     const { email, expoPushToken } = req.body;
 
-<<<<<<< HEAD
     if (!email || !expoPushToken) {
       return res.status(400).json({ error: "Email and token required" });
     }
@@ -1796,13 +1375,12 @@ app.post("/api/update-push-token", async (req, res) => {
 });
 
 // ==================== 1. Get all jobs ====================
-=======
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 app.get("/api/alljobs", async (req, res) => {
   try {
-    const jobs = await Job.find().sort({ createdAt: -1 });
+    const jobs = await Job.find().sort({ createdAt: -1 }); // latest jobs first
     res.status(200).json(jobs);
   } catch (err) {
+    console.error("Error fetching jobs:", err);
     res.status(500).json({ message: "Server Error" });
   }
 });
@@ -1872,6 +1450,7 @@ app.get("/api/debug-users", async (req, res) => {
   }
 });
 
+// ==================== 2. Get jobs created by a specific contractor by email ====================
 app.get("/api/my-jobs-email/:email", async (req, res) => {
   const { email } = req.params;
   try {
@@ -1880,49 +1459,97 @@ app.get("/api/my-jobs-email/:email", async (req, res) => {
     });
     res.status(200).json(jobs);
   } catch (err) {
+    console.error(`Error fetching jobs for ${email}:`, err);
     res.status(500).json({ message: "Server Error" });
   }
 });
 
 app.get("/api/filter", async (req, res) => {
   try {
-    const { userEmail, location, skill, startDate, endDate, minBudget, maxBudget } = req.query;
+    const {
+      userEmail, // current logged-in user to exclude their jobs
+      location,
+      skill,
+      startDate,
+      endDate,
+      minBudget,
+      maxBudget,
+    } = req.query;
+
+    // Build dynamic query
     const query = {};
-    if (userEmail) query["createdBy.email"] = { $ne: userEmail };
+
+    // Exclude current user's jobs
+    if (userEmail) {
+      query["createdBy.email"] = { $ne: userEmail };
+    }
+
     if (location) query.location = location;
     if (skill) query.skill = skill;
-    if (startDate && endDate) { query.startDate = { $gte: new Date(startDate) }; query.endDate = { $lte: new Date(endDate) }; }
-    else if (startDate) query.startDate = { $gte: new Date(startDate) };
-    else if (endDate) query.endDate = { $lte: new Date(endDate) };
+
+    if (startDate && endDate) {
+      query.startDate = { $gte: new Date(startDate) };
+      query.endDate = { $lte: new Date(endDate) };
+    } else if (startDate) {
+      query.startDate = { $gte: new Date(startDate) };
+    } else if (endDate) {
+      query.endDate = { $lte: new Date(endDate) };
+    }
+
     if (minBudget || maxBudget) {
       query.budget = {};
       if (minBudget) query.budget.$gte = Number(minBudget);
       if (maxBudget) query.budget.$lte = Number(maxBudget);
     }
+
+    // Fetch filtered jobs
     const jobs = await Job.find(query).sort({ createdAt: -1 });
+
+    // Fetch dropdown options dynamically
     const cities = await Job.distinct("location");
     const skillsList = await Job.distinct("skill");
-    res.status(200).json({ filters: { cities, skills: skillsList }, jobs });
+
+    res.status(200).json({
+      filters: { cities, skills: skillsList },
+      jobs,
+    });
   } catch (err) {
+    console.error("Filter Jobs Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+// ==================== PROFILE API ====================
 app.get("/api/profile/:email", async (req, res) => {
   try {
     const { email } = req.params;
-    const user = await User.findOne({ email: email.trim().toLowerCase() }).select("firstName lastName role email image createdAt reviews").lean();
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() })
+      .select("firstName lastName role email image createdAt reviews")
+      .lean();
+
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    const DEFAULT_IMAGE =
+      "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png";
     user.image = user.image?.trim() || DEFAULT_IMAGE;
+
+    // ⭐ Reviews logic
     const reviews = user.reviews || [];
     const totalReviews = reviews.length;
-    const averageRating = totalReviews > 0 ? (reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews).toFixed(1) : 0;
+    const averageRating =
+      totalReviews > 0
+        ? (
+            reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews
+          ).toFixed(1)
+        : 0;
 
-    let jobsCreated = [], jobsApplied = [], totalApplicantsOnJobs = 0;
+    let jobsCreated = [];
+    let jobsApplied = [];
+    let totalApplicantsOnJobs = 0;
+
     if (user.role === "Contractor") {
       jobsCreated = await Job.find({ "createdBy.email": email }).lean();
-<<<<<<< HEAD
       totalApplicantsOnJobs = jobsCreated.reduce(
         (acc, job) => acc + (job.applicants?.length || 0),
         0,
@@ -1942,30 +1569,30 @@ app.get("/api/profile/:email", async (req, res) => {
           appliedAt: applicant?.appliedAt || null,
           contractor: job.createdBy,
         };
-=======
-      totalApplicantsOnJobs = jobsCreated.reduce((acc, job) => acc + (job.applicants?.length || 0), 0);
-    } else {
-      const applications = await Job.find({ "applicants.laborId": user._id }).lean();
-      jobsApplied = applications.map((job) => {
-        const applicant = job.applicants.find((a) => a.laborId.toString() === user._id.toString());
-        return { jobId: job._id, title: job.title, status: applicant?.status || "pending", appliedAt: applicant?.appliedAt || null, contractor: job.createdBy };
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
       });
     }
 
     res.json({
-      user: { ...user, averageRating, totalReviews },
-      reviews,
-      stats: { totalJobsPosted: jobsCreated.length, totalJobsApplied: jobsApplied.length, totalApplicantsOnJobs },
+      user: {
+        ...user,
+        averageRating,
+        totalReviews,
+      },
+      reviews, // ⭐ FULL REVIEWS ARRAY
+      stats: {
+        totalJobsPosted: jobsCreated.length,
+        totalJobsApplied: jobsApplied.length,
+        totalApplicantsOnJobs,
+      },
       jobsCreated,
       jobsApplied,
     });
   } catch (err) {
+    console.error("Profile API error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-<<<<<<< HEAD
 // ==================== Get jobs a user applied to ====================
 app.get("/api/jobs/user/:email", async (req, res) => {
   try {
@@ -1987,22 +1614,12 @@ app.get("/api/jobs/user/:email", async (req, res) => {
       labourEmail: email,
     }).lean();
 
-=======
-app.get("/api/jobs/user/:email", async (req, res) => {
-  try {
-    const { email } = req.params;
-    const user = await User.findOne({ email: email.trim().toLowerCase() }).lean();
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const jobsCreated = await Job.find({ "createdBy.email": email }).sort({ createdAt: -1 }).lean();
-    const jobApplications = await JobApplication.find({ labourEmail: email }).lean();
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     const jobsApplied = [];
     for (const app of jobApplications) {
       const job = await Job.findById(app.jobId).lean();
       if (!job) continue;
+
       jobsApplied.push({
-<<<<<<< HEAD
         jobId: job._id,
         title: job.title,
         status: "pending", // default or you can extend to fetch from Job.applicants
@@ -2016,15 +1633,10 @@ app.get("/api/jobs/user/:email", async (req, res) => {
             job.createdBy.image ||
             "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png",
         },
-=======
-        jobId: job._id, title: job.title, status: "pending", appliedAt: app.appliedAt,
-        contractor: { firstName: job.createdBy.firstName, lastName: job.createdBy.lastName, email: job.createdBy.email, role: job.createdBy.role, image: job.createdBy.image || DEFAULT_IMAGE },
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
       });
     }
 
     res.status(200).json({
-<<<<<<< HEAD
       user: {
         firstName: user.firstName,
         lastName: user.lastName,
@@ -2040,21 +1652,17 @@ app.get("/api/jobs/user/:email", async (req, res) => {
       },
       jobsCreated,
       jobsApplied,
-=======
-      user: { firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role, image: user.image || DEFAULT_IMAGE },
-      stats: { totalJobsPosted: jobsCreated.length, totalJobsApplied: jobsApplied.length },
-      jobsCreated, jobsApplied,
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     });
   } catch (err) {
+    console.error("Error fetching user jobs:", err);
     res.status(500).json({ message: "Server Error" });
   }
 });
 
+// ==================== Get all responses for jobs posted by a contractor ====================
 app.get("/api/responses-by-contractor/:email", async (req, res) => {
   try {
     const { email } = req.params;
-<<<<<<< HEAD
 
     // Step 1: Find all job applications for this contractor
     const applications = await JobApplication.find({
@@ -2065,18 +1673,16 @@ app.get("/api/responses-by-contractor/:email", async (req, res) => {
         .status(404)
         .json({ message: "No responses found for this contractor" });
     }
-=======
-    const applications = await JobApplication.find({ contractorEmail: email }).lean();
-    if (!applications || applications.length === 0) return res.status(404).json({ message: "No responses found" });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 
+    // Step 2: For each application, fetch job info and labour info
     const results = [];
     for (const app of applications) {
       const job = await Job.findById(app.jobId).lean();
       if (!job) continue;
+
       const labour = await User.findOne({ email: app.labourEmail }).lean();
+
       results.push({
-<<<<<<< HEAD
         applicationId: app._id,
         jobId: job._id,
         jobTitle: job.title,
@@ -2094,24 +1700,27 @@ app.get("/api/responses-by-contractor/:email", async (req, res) => {
             labour?.image ||
             "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211467.png",
         },
-=======
-        applicationId: app._id, jobId: job._id, jobTitle: job.title, jobDescription: job.description,
-        location: job.location, workersRequired: job.workersRequired, appliedAt: app.appliedAt,
-        labour: { labourId: labour?._id || null, firstName: labour?.firstName || "Unknown", lastName: labour?.lastName || "Unknown", email: labour?.email || app.labourEmail, role: labour?.role || "Labour", image: labour?.image || DEFAULT_IMAGE },
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
       });
     }
-    res.status(200).json({ contractorEmail: email, totalResponses: results.length, responses: results });
+
+    res.status(200).json({
+      contractorEmail: email,
+      totalResponses: results.length,
+      responses: results,
+    });
   } catch (err) {
+    console.error("Error fetching contractor responses:", err);
     res.status(500).json({ message: "Server Error" });
   }
 });
 
+// ==================== SEARCH JOBS (by skill + name) ====================
 app.get("/api/search-jobs", async (req, res) => {
   try {
     const { skill, name } = req.query;
+
+    // Build query object dynamically
     const query = {};
-<<<<<<< HEAD
 
     if (skill && skill.trim() !== "") {
       query.skill = { $regex: new RegExp(skill, "i") }; // case-insensitive match
@@ -2128,37 +1737,51 @@ app.get("/api/search-jobs", async (req, res) => {
       count: jobs.length,
       jobs,
     });
-=======
-    if (skill?.trim()) query.skill = { $regex: new RegExp(skill, "i") };
-    if (name?.trim()) query.title = { $regex: new RegExp(name, "i") };
-    const jobs = await Job.find(query).sort({ createdAt: -1 });
-    return res.json({ success: true, count: jobs.length, jobs });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
   } catch (err) {
-    res.status(500).json({ success: false, message: "Server error while searching jobs" });
+    console.error("Search Jobs Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error while searching jobs",
+    });
   }
 });
 
 app.post("/api/apply/:jobId", async (req, res) => {
   try {
     const { jobId } = req.params;
-    const { labourEmail } = req.body;
-    if (!labourEmail) return res.status(400).json({ message: "Labour email is required" });
+    const { labourEmail } = req.body; // get email from frontend
+
+    if (!labourEmail) {
+      return res.status(400).json({ message: "Labour email is required" });
+    }
+
+    // Fetch job
     const job = await Job.findById(jobId);
     if (!job) return res.status(404).json({ message: "Job not found" });
+
+    // Check if already applied
     const exists = await JobApplication.findOne({ jobId, labourEmail });
     if (exists) return res.status(400).json({ message: "Already applied" });
-    const application = new JobApplication({ jobId, contractorEmail: job.createdBy.email, labourEmail });
+
+    const application = new JobApplication({
+      jobId,
+      contractorEmail: job.createdBy.email,
+      labourEmail,
+    });
+
     await application.save();
+
+    // Update job's applicant count
     job.noOfWorkersApplied = (job.noOfWorkersApplied || 0) + 1;
     await job.save();
+
     res.status(200).json({ success: true, application });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-<<<<<<< HEAD
 // // ------------------- Chat Schema -------------------
 // const chatSchema = new mongoose.Schema(
 //   {
@@ -2250,23 +1873,22 @@ app.post("/api/apply/:jobId", async (req, res) => {
 // });
 
 // Get user by email
-=======
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 app.get("/api/get-user-by-email/:email", async (req, res) => {
   try {
     const user = await User.findOne({ email: req.params.email }).lean();
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json({ id: user._id });
   } catch (err) {
+    console.error("Fetch user error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+// ================= Check Application Status (Using Logged-in User) =================
 app.get("/api/check-application/:jobId", async (req, res) => {
   try {
     const { jobId } = req.params;
     const userEmail = req.query.email?.trim().toLowerCase();
-<<<<<<< HEAD
 
     if (!userEmail) {
       return res.status(400).json({ message: "Email is required for testing" });
@@ -2281,17 +1903,12 @@ app.get("/api/check-application/:jobId", async (req, res) => {
       applied: !!application,
       message: application ? "User already applied" : "User has not applied",
     });
-=======
-    if (!userEmail) return res.status(400).json({ message: "Email is required" });
-    const application = await JobApplication.findOne({ jobId, labourEmail: userEmail });
-    res.json({ applied: !!application, message: application ? "User already applied" : "User has not applied" });
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
   } catch (err) {
+    console.error("Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-<<<<<<< HEAD
 // Industry Mongoose Schema
 const industrySchema = new mongoose.Schema(
   {
@@ -2365,42 +1982,10 @@ app.post("/api/industries", async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-=======
-// ==================== INDUSTRY SCHEMA ====================
-const industrySchema = new mongoose.Schema({
-  industry: { type: String, required: true },
-  owner: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  phone: { type: String, required: true },
-  address: { type: String, required: true },
-  textileType: { type: String, required: true },
-  password: { type: String, required: true },
-  active: { type: Boolean, default: false },
-}, { timestamps: true });
-
-const Industry = mongoose.model("Industry", industrySchema);
-
-// ==================== INDUSTRY ROUTES ====================
-
-app.post("/api/industries", async (req, res) => {
-  try {
-    const { industry, owner, email, phone, address, textileType, password } = req.body;
-    if (!industry || !owner || !email || !phone || !address || !textileType || !password)
-      return res.status(400).json({ message: "All fields are required" });
-    if (!validator.isEmail(email)) return res.status(400).json({ message: "Invalid email format" });
-    if (password.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
-    const existing = await Industry.findOne({ email });
-    if (existing) return res.status(400).json({ message: "Email already registered" });
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newIndustry = await Industry.create({ industry, owner, email, phone, address, textileType, password: hashedPassword });
-    res.status(201).json({ message: "Industry registered successfully", industry: newIndustry });
-  } catch (err) {
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     res.status(500).json({ message: "Server error" });
   }
 });
 
-<<<<<<< HEAD
 // Get all active industries except current logged-in one
 app.get("/api/industries/all", async (req, res) => {
   try {
@@ -2422,21 +2007,10 @@ app.get("/api/industries/all", async (req, res) => {
     res.status(200).json(industries);
   } catch (err) {
     console.error(err);
-=======
-app.get("/api/industries/all", async (req, res) => {
-  try {
-    const { email, search } = req.query;
-    let query = { active: true, email: { $ne: email } };
-    if (search) query.industry = { $regex: search, $options: "i" };
-    const industries = await Industry.find(query).select("industry email address textileType");
-    res.status(200).json(industries);
-  } catch (err) {
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
     res.status(500).json({ message: "Server error" });
   }
 });
 
-<<<<<<< HEAD
 const borrowSchema = new mongoose.Schema(
   {
     fromIndustryEmail: { type: String, required: true },
@@ -2455,111 +2029,35 @@ const borrowSchema = new mongoose.Schema(
 );
 
 const Borrow = mongoose.model("Borrow", borrowSchema);
-=======
-app.post("/api/industries/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ message: "Email and password are required" });
-    if (!validator.isEmail(email)) return res.status(400).json({ message: "Invalid email format" });
-    const industry = await Industry.findOne({ email });
-    if (!industry) return res.status(400).json({ message: "Invalid credentials" });
-    const isMatch = await bcrypt.compare(password, industry.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
-    const token = jwt.sign({ id: industry._id, email: industry.email }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    res.status(200).json({ message: "Login successful", email: industry.email, token, active: industry.active });
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-app.get("/api/industries/profile", async (req, res) => {
-  try {
-    const { email } = req.query;
-    if (!email || typeof email !== "string") return res.status(400).json({ message: "Email is required" });
-    const industry = await Industry.findOne({ email }).select("-password");
-    if (!industry) return res.status(404).json({ message: "Industry not found" });
-    res.status(200).json(industry);
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-app.post("/api/admin/industry-toggle/:id", async (req, res) => {
-  try {
-    const industry = await Industry.findById(req.params.id);
-    if (!industry) return res.status(404).json({ error: "Industry not found" });
-    industry.active = !industry.active;
-    await industry.save();
-    res.redirect("/api/admin");
-  } catch (err) {
-    res.status(500).send("Server error");
-  }
-});
-
-// ==================== BORROW SCHEMA ====================
-const borrowSchema = new mongoose.Schema({
-  fromIndustryEmail: { type: String, required: true },
-  toIndustryEmail: { type: String, required: true },
-  labourRequired: Number,
-  skills: String,
-  description: String,
-  date: String,
-  time: String,
-  location: String,
-  status: { type: String, default: "Pending" },
-}, { timestamps: true });
-
-const Borrow = mongoose.model("Borrow", borrowSchema);
-
-// ==================== BORROW ROUTES ====================
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 
 app.post("/api/borrow", async (req, res) => {
   try {
+    // 1️⃣ Save borrow request
     const borrow = await Borrow.create(req.body);
-    res.status(201).json({ message: "Borrow request sent", borrow });
 
-    const { toIndustryEmail, fromIndustryEmail, labourRequired, skills, description, fromDate, toDate, shift, shiftTime, location } = req.body;
-    if (!toIndustryEmail) return;
+    res.status(201).json({
+      message: "Borrow request sent",
+      borrow,
+    });
 
-    try {
-      await sgMail.send({
-        to: toIndustryEmail,
-        from: process.env.SENDGRID_VERIFIED_SENDER,
-        subject: "Labour Hub - New Labour Borrow Request",
-        html: `
-          <div style="font-family:'Segoe UI',sans-serif;background:#f5f7fa;padding:40px 0;">
-            <div style="max-width:620px;margin:auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 10px 25px rgba(0,0,0,.12)">
-              <div style="background:linear-gradient(135deg,#0a66c2,#004182);padding:26px;text-align:center;">
-                <h1 style="color:#fff;margin:0;">Labour Hub</h1>
-                <p style="color:#dbeafe;margin-top:6px;">New Borrow Request</p>
-              </div>
-              <div style="padding:30px;color:#1f2937;">
-                <p>You have received a <strong>new labour borrow request</strong> from <strong>${fromIndustryEmail}</strong>.</p>
-                <div style="margin-top:20px;background:#f9fafb;padding:20px;border-radius:12px;border:1px solid #e5e7eb;">
-                  <table width="100%" style="font-size:14px;">
-                    <tr><td>Labour Required</td><td><strong>${labourRequired}</strong></td></tr>
-                    <tr><td>Skills</td><td><strong>${skills}</strong></td></tr>
-                    <tr><td>Duration</td><td>${fromDate} → ${toDate}</td></tr>
-                    <tr><td>Shift</td><td>${shift} (${shiftTime})</td></tr>
-                    <tr><td>Location</td><td>${location}</td></tr>
-                    <tr><td>Description</td><td>${description}</td></tr>
-                  </table>
-                </div>
-                <div style="text-align:center;margin-top:30px;">
-                  <a href="https://labourhub.pk/dashboard" style="background:#0a66c2;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:600;">View Request</a>
-                </div>
-              </div>
-              <div style="background:#f3f4f6;padding:18px;text-align:center;font-size:13px;color:#6b7280;">
-                © ${new Date().getFullYear()} Labour Hub · Karachi, Pakistan
-              </div>
-            </div>
-          </div>`,
-      });
-    } catch (emailErr) {
-      console.error("Borrow email failed:", emailErr.message);
+    // 2️⃣ EMAIL LOGIC (AFTER RESPONSE)
+    const {
+      toIndustryEmail,
+      fromIndustryEmail,
+      labourRequired,
+      skills,
+      description,
+      fromDate,
+      toDate,
+      shift,
+      shiftTime,
+      location,
+    } = req.body;
+
+    if (!toIndustryEmail) {
+      console.error("❌ toIndustryEmail missing");
+      return;
     }
-<<<<<<< HEAD
 
     const msg = {
       to: toIndustryEmail, // ✅ FIXED
@@ -2613,91 +2111,114 @@ app.post("/api/borrow", async (req, res) => {
 
     await sgMail.send(msg);
     console.log("✅ Borrow request email sent to", toIndustryEmail);
-=======
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
   } catch (err) {
-    console.error("Borrow API error:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("❌ Borrow API error:", err);
   }
 });
 
-<<<<<<< HEAD
 // ==================== API to Get Borrow Records for Logged-in User ====================
-=======
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 app.get("/api/my-borrows/:email", async (req, res) => {
   try {
-    const myBorrows = await Borrow.find({ fromIndustryEmail: req.params.email });
-    if (!myBorrows.length) return res.status(404).json({ message: "No borrow records found." });
+    const userEmail = req.params.email; // Logged-in user's email
+
+    // Find all borrows where this user applied (as fromIndustryEmail)
+    const myBorrows = await Borrow.find({ fromIndustryEmail: userEmail });
+
+    if (!myBorrows.length) {
+      return res.status(404).json({ message: "No borrow records found." });
+    }
+
     res.status(200).json(myBorrows);
-  } catch (err) {
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-<<<<<<< HEAD
 // Get borrow requests sent TO the logged-in user
-=======
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 app.get("/api/incoming-borrows/:email", async (req, res) => {
   try {
-    const incomingBorrows = await Borrow.find({ toIndustryEmail: req.params.email });
-    if (!incomingBorrows.length) return res.status(404).json({ message: "No incoming requests." });
+    const userEmail = req.params.email;
+
+    const incomingBorrows = await Borrow.find({ toIndustryEmail: userEmail });
+
+    if (!incomingBorrows.length) {
+      return res.status(404).json({ message: "No incoming requests." });
+    }
+
     res.status(200).json(incomingBorrows);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+// ==================== Approve Borrow API ====================
 app.post("/api/approve-borrow/:id", async (req, res) => {
   try {
-    const borrow = await Borrow.findById(req.params.id);
-    if (!borrow) return res.status(404).json({ message: "Borrow request not found." });
+    const borrowId = req.params.id;
+
+    // Find the borrow request
+    const borrow = await Borrow.findById(borrowId);
+    if (!borrow) {
+      return res.status(404).json({ message: "Borrow request not found." });
+    }
+
+    // Update status to Approved
     borrow.status = "Approved";
     await borrow.save();
 
+    // ✅ Attempt to send email, but don't crash if it fails
     if (borrow.fromIndustryEmail && process.env.SENDGRID_VERIFIED_SENDER) {
-      try {
-        await sgMail.send({
-          to: borrow.fromIndustryEmail,
-          from: process.env.SENDGRID_VERIFIED_SENDER,
-          subject: "Labour Hub - Borrow Request Approved",
-          html: `
-            <div style="font-family:'Segoe UI',sans-serif;background:#f5f7fa;padding:40px 0;">
-              <div style="max-width:620px;margin:auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 10px 25px rgba(0,0,0,.12)">
-                <div style="background:linear-gradient(135deg,#0a66c2,#004182);padding:26px;text-align:center;">
-                  <h1 style="color:#fff;margin:0;">Labour Hub</h1>
-                  <p style="color:#dbeafe;margin-top:6px;">Borrow Request Approved</p>
-                </div>
-                <div style="padding:30px;color:#1f2937;">
-                  <p>Your borrow request to <strong>${borrow.toIndustryEmail}</strong> has been <strong>approved</strong>.</p>
-                  <div style="background:#f9fafb;padding:20px;border-radius:12px;border:1px solid #e5e7eb;">
-                    <table width="100%" style="font-size:14px;">
-                      <tr><td>Labour Required</td><td><strong>${borrow.labourRequired}</strong></td></tr>
-                      <tr><td>Skills</td><td><strong>${borrow.skills}</strong></td></tr>
-                      <tr><td>Date</td><td>${borrow.date}</td></tr>
-                      <tr><td>Time</td><td>${borrow.time}</td></tr>
-                      <tr><td>Location</td><td>${borrow.location}</td></tr>
-                    </table>
-                  </div>
-                </div>
-                <div style="background:#f3f4f6;padding:18px;text-align:center;font-size:13px;color:#6b7280;">
-                  © ${new Date().getFullYear()} Labour Hub · Karachi, Pakistan
-                </div>
+      const msg = {
+        to: borrow.fromIndustryEmail,
+        from: process.env.SENDGRID_VERIFIED_SENDER,
+        subject: "Labour Hub - Borrow Request Approved",
+        html: `
+        <div style="font-family: 'Segoe UI', sans-serif; background:#f5f7fa; padding:40px 0;">
+          <div style="max-width:620px; margin:auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,.12)">
+            <div style="background:linear-gradient(135deg,#0a66c2,#004182); padding:26px; text-align:center;">
+              <h1 style="color:#fff; margin:0;">Labour Hub</h1>
+              <p style="color:#dbeafe; margin-top:6px;">Borrow Request Approved</p>
+            </div>
+            <div style="padding:30px; color:#1f2937;">
+              <p>Your borrow request to <strong>${borrow.toIndustryEmail}</strong> has been <strong>approved</strong>.</p>
+              <div style="margin-top:20px; background:#f9fafb; padding:20px; border-radius:12px; border:1px solid #e5e7eb;">
+                <table width="100%" style="font-size:14px;">
+                  <tr><td>Labour Required</td><td><strong>${borrow.labourRequired}</strong></td></tr>
+                  <tr><td>Skills</td><td><strong>${borrow.skills}</strong></td></tr>
+                  <tr><td>Date</td><td>${borrow.date}</td></tr>
+                  <tr><td>Time</td><td>${borrow.time}</td></tr>
+                  <tr><td>Location</td><td>${borrow.location}</td></tr>
+                  <tr><td>Description</td><td>${borrow.description}</td></tr>
+                </table>
               </div>
-            </div>`,
-        });
+            </div>
+            <div style="background:#f3f4f6; padding:18px; text-align:center; font-size:13px; color:#6b7280;">
+              © ${new Date().getFullYear()} Labour Hub · Karachi, Pakistan
+            </div>
+          </div>
+        </div>
+        `,
+      };
+
+      try {
+        await sgMail.send(msg);
+        console.log("✅ Approval email sent to", borrow.fromIndustryEmail);
       } catch (emailErr) {
-        console.error("Approval email failed:", emailErr.message);
+        console.error("⚠️ Email failed to send:", emailErr.message);
       }
+    } else {
+      console.log("⚠️ No email configured or sender missing. Skipping email.");
     }
+
     res.status(200).json({ message: "Borrow request approved", borrow });
   } catch (err) {
+    console.error("❌ Approve borrow error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-<<<<<<< HEAD
 // app.post("/api/borrow", async (req, res) => {
 //   try {
 //     const borrow = await Borrow.create(req.body);
@@ -2819,9 +2340,6 @@ app.post("/api/admin/industry-toggle/:id", async (req, res) => {
   }
 });
 
-=======
-// ==================== ADMIN PANEL ====================
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 app.get("/api/admin", async (req, res) => {
   try {
     const users = await User.find().lean();
@@ -2830,27 +2348,96 @@ app.get("/api/admin", async (req, res) => {
     const industries = await Industry.find().lean();
     const borrows = await Borrow.find().lean();
 
-    const html = `<!DOCTYPE html>
-<html><head><title>Labour Hub | Admin Panel</title><meta charset="UTF-8"/>
-<style>
-  body{font-family:"Segoe UI",sans-serif;background:#f4f6f9;padding:20px;}
-  h1{color:#0a66c2;margin-bottom:10px;}
-  h2{margin-top:40px;color:#111827;border-left:6px solid #0a66c2;padding-left:10px;}
-  table{width:100%;border-collapse:collapse;margin-top:15px;background:#fff;box-shadow:0 6px 18px rgba(0,0,0,.06);border-radius:10px;overflow:hidden;}
-  th,td{padding:10px;border-bottom:1px solid #e5e7eb;font-size:14px;text-align:left;}
-  th{background:#0a66c2;color:#fff;font-weight:600;}
-  tr:nth-child(even){background:#f9fafb;}
-  tr:hover{background:#eef2ff;}
-  .toggle-btn{border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;color:#fff;}
-  .toggle-btn.green{background:#16a34a;}.toggle-btn.red{background:#dc2626;}
-  .badge{padding:4px 8px;border-radius:6px;font-size:12px;color:white;}
-  .green{background:#16a34a;}.red{background:#dc2626;}.blue{background:#2563eb;}.gray{background:#6b7280;}
-  footer{margin-top:40px;text-align:center;color:#6b7280;font-size:13px;}
-</style></head><body>
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Labour Hub | Admin Panel</title>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f6f9;
+      padding: 20px;
+    }
+    h1 {
+      color: #0a66c2;
+      margin-bottom: 10px;
+    }
+    h2 {
+      margin-top: 40px;
+      color: #111827;
+      border-left: 6px solid #0a66c2;
+      padding-left: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      background: #ffffff;
+      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+      text-align: left;
+    }
+    th {
+      background: #0a66c2;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    tr:nth-child(even) {
+      background: #f9fafb;
+    }
+    tr:hover {
+      background: #eef2ff;
+    }
+      .toggle-btn {
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+}
+
+.toggle-btn.green { background: #16a34a; }
+.toggle-btn.red { background: #dc2626; }
+
+.toggle-btn:hover {
+  opacity: 0.9;
+}
+
+    .badge {
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: white;
+    }
+    .green { background: #16a34a; }
+    .red { background: #dc2626; }
+    .blue { background: #2563eb; }
+    .gray { background: #6b7280; }
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
 <h1>📊 Labour Hub – Admin Panel</h1>
 
+<!-- USERS -->
 <h2>👤 Users</h2>
-<<<<<<< HEAD
 <table>
 <tr>
   <th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Skills</th><th>Created</th>
@@ -2868,14 +2455,10 @@ ${users
 </tr>`,
   )
   .join("")}
-=======
-<table><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Skills</th><th>Created</th></tr>
-${users.map((u) => `<tr><td>${u.firstName} ${u.lastName}</td><td>${u.email}</td><td>${u.phone}</td><td><span class="badge blue">${u.role}</span></td><td>${u.skills?.join(", ") || "-"}</td><td>${new Date(u.createdAt).toLocaleString()}</td></tr>`).join("")}
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 </table>
 
+<!-- JOBS -->
 <h2>🛠 Jobs</h2>
-<<<<<<< HEAD
 <table>
 <tr>
   <th>Title</th><th>Location</th><th>Skill</th><th>Budget</th>
@@ -2895,14 +2478,10 @@ ${jobs
 </tr>`,
   )
   .join("")}
-=======
-<table><tr><th>Title</th><th>Location</th><th>Skill</th><th>Budget</th><th>Workers</th><th>Applicants</th><th>Posted By</th></tr>
-${jobs.map((j) => `<tr><td>${j.title}</td><td>${j.location}</td><td>${j.skill}</td><td>${j.budget}</td><td>${j.workersRequired}</td><td>${j.noOfWorkersApplied || 0}</td><td>${j.createdBy?.email || "-"}</td></tr>`).join("")}
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 </table>
 
+<!-- JOB APPLICATIONS -->
 <h2>📄 Job Applications</h2>
-<<<<<<< HEAD
 <table>
 <tr>
   <th>Job ID</th><th>Contractor</th><th>Labour</th><th>Date</th>
@@ -2918,14 +2497,9 @@ ${applications
 </tr>`,
   )
   .join("")}
-=======
-<table><tr><th>Job ID</th><th>Contractor</th><th>Labour</th><th>Date</th></tr>
-${applications.map((a) => `<tr><td>${a.jobId}</td><td>${a.contractorEmail}</td><td>${a.labourEmail}</td><td>${new Date(a.appliedAt).toLocaleString()}</td></tr>`).join("")}
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 </table>
-
+<!-- INDUSTRIES -->
 <h2>🏭 Industries</h2>
-<<<<<<< HEAD
 <table>
 <tr>
   <th>Industry</th>
@@ -2971,16 +2545,10 @@ ${industries
   )
   .join("")}
 
-=======
-<table><tr><th>Industry</th><th>Owner</th><th>Email</th><th>Phone</th><th>Textile</th><th>Status</th></tr>
-${industries.map((i) => `<tr><td>${i.industry}</td><td>${i.owner}</td><td>${i.email}</td><td>${i.phone}</td><td>${i.textileType}</td>
-<td><form method="POST" action="/api/admin/industry-toggle/${i._id}" onsubmit="return confirm('${i.active ? "Deactivate" : "Activate"} this industry?');">
-<button type="submit" class="toggle-btn ${i.active ? "green" : "red"}">${i.active ? "Active" : "Inactive"}</button></form></td></tr>`).join("")}
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 </table>
 
+<!-- BORROW REQUESTS -->
 <h2>🔄 Borrow Requests</h2>
-<<<<<<< HEAD
 <table>
 <tr>
   <th>From</th><th>To</th><th>Labour</th><th>Skills</th>
@@ -3007,40 +2575,65 @@ ${borrows
 </tr>`,
   )
   .join("")}
-=======
-<table><tr><th>From</th><th>To</th><th>Labour</th><th>Skills</th><th>Location</th><th>Status</th></tr>
-${borrows.map((b) => `<tr><td>${b.fromIndustryEmail}</td><td>${b.toIndustryEmail}</td><td>${b.labourRequired}</td><td>${b.skills}</td><td>${b.location}</td>
-<td><span class="badge ${b.status === "Approved" ? "green" : b.status === "Rejected" ? "red" : "gray"}">${b.status}</span></td></tr>`).join("")}
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
 </table>
 
-<footer>© ${new Date().getFullYear()} Labour Hub · Admin Panel</footer>
-</body></html>`;
+<footer>
+  © ${new Date().getFullYear()} Labour Hub · Admin Panel
+</footer>
+<script>
+  function toggleIndustry(id, currentStatus) {
+    const action = currentStatus ? "deactivate" : "activate";
+
+    if (!confirm("Are you sure you want to " + action + " this industry?")) {
+      return;
+    }
+
+    fetch(window.location.origin + "/api/admin/industry-toggle/" + id, {
+      method: "POST"
+    })
+    .then(res => {
+      if (!res.ok) throw new Error("Request failed");
+      return res.json();
+    })
+    .then(data => {
+      alert("Industry is now " + (data.active ? "Active" : "Inactive"));
+      location.reload();
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Failed to update industry status");
+    });
+  }
+</script>
+
+</body>
+</html>
+`;
 
     res.send(html);
   } catch (err) {
+    console.error(err);
     res.status(500).send("Server Error");
   }
 });
 
-// ==================== ROOT ====================
-app.get("/", (req, res) => res.send("🚀 Labour Hub APIs are running!"));
-
-// ==================== DB CONNECT ====================
+/* ---------- DB connect & server start ---------- */
 async function start() {
-  if (!process.env.MONGO_URI) { console.error("MONGO_URI missing in .env"); process.exit(1); }
-  if (!process.env.JWT_SECRET) { console.error("JWT_SECRET missing in .env"); process.exit(1); }
+  if (!process.env.MONGO_URI) {
+    console.error("MONGO_URI missing in .env");
+    process.exit(1);
+  }
+  if (!process.env.JWT_SECRET) {
+    console.error("JWT_SECRET missing in .env");
+    process.exit(1);
+  }
+
   try {
-<<<<<<< HEAD
     await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
     console.log("Connected to MongoDB");
-=======
-    await mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
-    console.log("✅ Connected to MongoDB");
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
   } catch (err) {
     console.error("Failed to connect to MongoDB:", err);
     process.exit(1);
@@ -3049,7 +2642,6 @@ async function start() {
 
 start();
 
-<<<<<<< HEAD
 // Root endpoint
 app.get("/", (req, res) => res.send("🚀 Labour Hub APIs areS running!"));
 
@@ -3057,9 +2649,3 @@ const port = process.env.PORT || 3000;
 app.listen(port, () =>
   console.log(`✅ Server running at http://localhost:${port}`),
 );
-=======
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`✅ Server running at http://localhost:${port}`));
-
-module.exports = app; // Required for Vercel serverless export
->>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c

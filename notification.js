@@ -210,12 +210,56 @@ async function sendServerStartNotification() {
   );
 }
 
-// Export all functions
+/**
+ * Send chat notification to a user
+ * @param {string} receiverEmail - Email of the user to notify
+ * @param {string} senderName - Name of the message sender
+ * @param {string} message - The message content
+ * @param {Object} additionalData - Additional data to include
+ */
+async function sendChatNotification(
+  receiverEmail,
+  senderName,
+  message,
+  additionalData = {},
+) {
+  try {
+    // You'll need to get the user's push token from the database
+    // This function should be called from the chat route after fetching the token
+    const notificationTitle = "💬 New Message";
+    const notificationBody = `${senderName}: ${message.substring(0, 100)}${message.length > 100 ? "..." : ""}`;
+
+    const notificationData = {
+      type: "new_chat_message",
+      senderEmail: additionalData.senderEmail,
+      senderName: senderName,
+      messageId: additionalData.messageId,
+      timestamp: new Date().toISOString(),
+      screen: "ChatScreen",
+      chatWith: additionalData.senderEmail,
+      ...additionalData,
+    };
+
+    // This will be called with the token already fetched
+    return await sendPushNotification(
+      additionalData.pushToken,
+      notificationTitle,
+      notificationBody,
+      notificationData,
+    );
+  } catch (error) {
+    console.error("Error sending chat notification:", error);
+    return false;
+  }
+}
+
+// Add to module.exports
 module.exports = {
   sendPushNotification,
   sendBatchNotifications,
   registerPushToken,
   getAllTokens,
   sendServerStartNotification,
-  notifyLabourUsersAboutNewJob, // Add this new function to exports
+  notifyLabourUsersAboutNewJob,
+  sendChatNotification, // Add this
 };
