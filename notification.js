@@ -6,10 +6,6 @@ let expoPushTokens = [];
 
 /**
  * Send a push notification via Expo's push notification service
- * @param {string} expoPushToken - The Expo push token
- * @param {string} title - Notification title
- * @param {string} body - Notification body
- * @param {object} data - Additional data to send with notification
  */
 async function sendPushNotification(expoPushToken, title, body, data = {}) {
   if (!expoPushToken) {
@@ -20,9 +16,9 @@ async function sendPushNotification(expoPushToken, title, body, data = {}) {
   const message = {
     to: expoPushToken,
     sound: "default",
-    title: title,
-    body: body,
-    data: data,
+    title,
+    body,
+    data,
     priority: "high",
   };
 
@@ -40,7 +36,7 @@ async function sendPushNotification(expoPushToken, title, body, data = {}) {
     const result = await response.json();
 
     if (response.ok) {
-      console.log("✅ Notification sent successfully!");
+      console.log("✅ Push notification sent successfully!");
       return true;
     } else {
       console.error("❌ Failed to send notification:", result);
@@ -53,11 +49,7 @@ async function sendPushNotification(expoPushToken, title, body, data = {}) {
 }
 
 /**
- * Send notification to multiple devices
- * @param {array} tokens - Array of Expo push tokens
- * @param {string} title - Notification title
- * @param {string} body - Notification body
- * @param {object} data - Additional data
+ * Send notification to multiple devices (batch)
  */
 async function sendBatchNotifications(tokens, title, body, data = {}) {
   if (!tokens || tokens.length === 0) {
@@ -68,9 +60,9 @@ async function sendBatchNotifications(tokens, title, body, data = {}) {
   const messages = tokens.map((token) => ({
     to: token,
     sound: "default",
-    title: title,
-    body: body,
-    data: data,
+    title,
+    body,
+    data,
     priority: "high",
   }));
 
@@ -88,7 +80,7 @@ async function sendBatchNotifications(tokens, title, body, data = {}) {
     const result = await response.json();
 
     if (response.ok) {
-      console.log(`✅ Sent notifications to ${tokens.length} devices`);
+      console.log(`✅ Batch notification sent to ${tokens.length} devices`);
       return { successCount: tokens.length, failCount: 0, result };
     } else {
       console.error("❌ Failed to send batch notifications:", result);
@@ -100,23 +92,18 @@ async function sendBatchNotifications(tokens, title, body, data = {}) {
   }
 }
 
-/**
- * Notify all labour users about a new job
- * @param {Array} labourUsers - Array of labour user objects with expoPushToken
- * @param {Object} job - The job object that was created
- * @returns {Object} Result with successCount and failCount
- */
+// ─────────────────────────────────────────────
+// 1. NEW JOB POSTED → notify all Labour users
+// ─────────────────────────────────────────────
 async function notifyLabourUsersAboutNewJob(labourUsers, job) {
   if (!labourUsers || labourUsers.length === 0) {
     console.log("⚠️ No labour users to notify");
     return { successCount: 0, failCount: 0 };
   }
 
-  // Prepare notification message
-  const notificationTitle = "🆕 New Job Posted!";
-  const notificationBody = `${job.skill} worker needed in ${job.location} | Budget: Rs.${job.budget}`;
-
-  const notificationData = {
+  const title = "🆕 New Job Posted!";
+  const body = `${job.skill} worker needed in ${job.location} | Budget: Rs.${job.budget}`;
+  const data = {
     jobId: job._id.toString(),
     title: job.title,
     location: job.location,
@@ -126,79 +113,191 @@ async function notifyLabourUsersAboutNewJob(labourUsers, job) {
     screen: "JobDetails",
   };
 
-  // Collect all valid tokens
   const validTokens = labourUsers
-    .filter(
-      (user) =>
-        user.expoPushToken &&
-        user.expoPushToken !== null &&
-        user.expoPushToken !== "",
-    )
-    .map((user) => user.expoPushToken);
+    .filter((u) => u.expoPushToken && u.expoPushToken !== "")
+    .map((u) => u.expoPushToken);
 
   if (validTokens.length === 0) {
     console.log("⚠️ No valid push tokens found among labour users");
     return { successCount: 0, failCount: 0 };
   }
 
-  console.log(`📨 Sending notifications to ${validTokens.length} labour users`);
-
-  // Send batch notification
-  const result = await sendBatchNotifications(
-    validTokens,
-    notificationTitle,
-    notificationBody,
-    notificationData,
-  );
-
-  return result;
+  console.log(`📨 Notifying ${validTokens.length} labour users about new job`);
+  return await sendBatchNotifications(validTokens, title, body, data);
 }
 
-/**
- * Register a new Expo push token
- * @param {string} token - Expo push token to register
- * @param {string} userId - Optional user ID to associate with token
- */
-function registerPushToken(token, userId = null) {
-  if (!token) return false;
-
-  // Check if token already exists
-  const existingToken = expoPushTokens.find((t) => t.token === token);
-
-  if (!existingToken) {
-    expoPushTokens.push({
-      token: token,
-      userId: userId,
-      registeredAt: new Date(),
-    });
-    console.log(`✅ Registered new push token: ${token.substring(0, 20)}...`);
-  } else {
-    console.log(`ℹ️ Token already registered`);
+// ─────────────────────────────────────────────
+// 2. JOB APPLICATION SUBMITTED → notify Contractor
+// ─────────────────────────────────────────────
+async function notifyContractorAboutApplication(contractorToken, labour, job) {
+  if (!contractorToken) {
+    console.log("⚠️ Contractor has no push token, skipping notification");
+    return false;
   }
 
-  return true;
+  const title = "👷 New Job Application!";
+  const body = `${labour.firstName} ${labour.lastName} applied for "${job.title}"`;
+  const data = {
+    type: "job_application",
+    jobId: job._id.toString(),
+    jobTitle: job.title,
+    labourEmail: labour.email,
+    labourName: `${labour.firstName} ${labour.lastName}`,
+    screen: "ApplicationDetails",
+  };
+
+  console.log(`📨 Notifying contractor about application on job: ${job.title}`);
+  return await sendPushNotification(contractorToken, title, body, data);
 }
 
-/**
- * Get all registered tokens
- */
-function getAllTokens() {
-  return expoPushTokens.map((t) => t.token);
+// ─────────────────────────────────────────────
+// 3. APPLICATION STATUS CHANGED → notify Labour
+// ─────────────────────────────────────────────
+async function notifyLabourAboutApplicationStatus(labourToken, job, status) {
+  if (!labourToken) {
+    console.log("⚠️ Labour has no push token, skipping notification");
+    return false;
+  }
+
+  const isAccepted = status === "accepted";
+  const title = isAccepted
+    ? "✅ Application Accepted!"
+    : "❌ Application Rejected";
+  const body = isAccepted
+    ? `Congratulations! Your application for "${job.title}" has been accepted.`
+    : `Your application for "${job.title}" was not selected this time.`;
+
+  const data = {
+    type: "application_status",
+    jobId: job._id.toString(),
+    jobTitle: job.title,
+    status,
+    screen: "MyApplications",
+  };
+
+  console.log(`📨 Notifying labour about application status: ${status}`);
+  return await sendPushNotification(labourToken, title, body, data);
 }
 
-/**
- * Send server start notification
- */
+// ─────────────────────────────────────────────
+// 4. BORROW REQUEST RECEIVED → notify target Industry
+// ─────────────────────────────────────────────
+async function notifyIndustryAboutBorrowRequest(
+  industryToken,
+  fromEmail,
+  borrow,
+) {
+  if (!industryToken) {
+    console.log("⚠️ Target industry has no push token, skipping");
+    return false;
+  }
+
+  const title = "🔄 New Borrow Request!";
+  const body = `${fromEmail} wants to borrow ${borrow.labourRequired} worker(s) — Skills: ${borrow.skills}`;
+  const data = {
+    type: "borrow_request",
+    borrowId: borrow._id.toString(),
+    fromEmail,
+    labourRequired: borrow.labourRequired?.toString(),
+    skills: borrow.skills,
+    screen: "IncomingBorrows",
+  };
+
+  console.log(`📨 Notifying industry about borrow request from: ${fromEmail}`);
+  return await sendPushNotification(industryToken, title, body, data);
+}
+
+// ─────────────────────────────────────────────
+// 5. BORROW REQUEST APPROVED → notify requester Industry
+// ─────────────────────────────────────────────
+async function notifyIndustryAboutBorrowApproval(requesterToken, borrow) {
+  if (!requesterToken) {
+    console.log("⚠️ Requester industry has no push token, skipping");
+    return false;
+  }
+
+  const title = "✅ Borrow Request Approved!";
+  const body = `Your borrow request to ${borrow.toIndustryEmail} for ${borrow.labourRequired} worker(s) has been approved!`;
+  const data = {
+    type: "borrow_approved",
+    borrowId: borrow._id.toString(),
+    toIndustryEmail: borrow.toIndustryEmail,
+    screen: "MyBorrows",
+  };
+
+  console.log(`📨 Notifying industry about borrow approval`);
+  return await sendPushNotification(requesterToken, title, body, data);
+}
+
+// ─────────────────────────────────────────────
+// 6. NEW CHAT MESSAGE → notify receiver
+// ─────────────────────────────────────────────
+async function sendChatNotification(
+  receiverToken,
+  senderName,
+  message,
+  additionalData = {},
+) {
+  if (!receiverToken) {
+    console.log("⚠️ Receiver has no push token, skipping chat notification");
+    return false;
+  }
+
+  const title = "💬 New Message";
+  const body = `${senderName}: ${message.substring(0, 100)}${message.length > 100 ? "..." : ""}`;
+  const data = {
+    type: "new_chat_message",
+    senderName,
+    senderEmail: additionalData.senderEmail || "",
+    chatWith: additionalData.senderEmail || "",
+    screen: "ChatScreen",
+    ...additionalData,
+  };
+
+  console.log(`📨 Sending chat notification from ${senderName}`);
+  return await sendPushNotification(receiverToken, title, body, data);
+}
+
+// ─────────────────────────────────────────────
+// 7. REVIEW ADDED → notify the reviewed user
+// ─────────────────────────────────────────────
+async function notifyUserAboutNewReview(
+  userToken,
+  reviewerEmail,
+  rating,
+  jobTitle,
+) {
+  if (!userToken) {
+    console.log("⚠️ User has no push token, skipping review notification");
+    return false;
+  }
+
+  const stars = "⭐".repeat(Math.round(rating));
+  const title = "⭐ New Review Received!";
+  const body = `${reviewerEmail} gave you ${stars} (${rating}/5)${jobTitle ? ` for "${jobTitle}"` : ""}`;
+  const data = {
+    type: "new_review",
+    reviewerEmail,
+    rating: rating.toString(),
+    screen: "Profile",
+  };
+
+  console.log(`📨 Notifying user about new review from: ${reviewerEmail}`);
+  return await sendPushNotification(userToken, title, body, data);
+}
+
+// ─────────────────────────────────────────────
+// 8. SERVER START (existing)
+// ─────────────────────────────────────────────
 async function sendServerStartNotification() {
-  console.log("🚀 Sending server start notification...");
+  console.log(
+    "🚀 Server started. Push token list has",
+    expoPushTokens.length,
+    "entries.",
+  );
 
   if (expoPushTokens.length === 0) {
-    console.log(
-      "⚠️ No registered tokens found. Add a token first using registerPushToken()",
-    );
-    console.log(
-      '📝 Example: registerPushToken("ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]")',
-    );
+    console.log("⚠️ No registered tokens. Skipping server start notification.");
     return;
   }
 
@@ -206,60 +305,42 @@ async function sendServerStartNotification() {
   await sendBatchNotifications(
     getAllTokens(),
     "🟢 Server Started",
-    `Server has been successfully started at ${currentTime}`,
+    `Server started at ${currentTime}`,
   );
 }
 
-/**
- * Send chat notification to a user
- * @param {string} receiverEmail - Email of the user to notify
- * @param {string} senderName - Name of the message sender
- * @param {string} message - The message content
- * @param {Object} additionalData - Additional data to include
- */
-async function sendChatNotification(
-  receiverEmail,
-  senderName,
-  message,
-  additionalData = {},
-) {
-  try {
-    // You'll need to get the user's push token from the database
-    // This function should be called from the chat route after fetching the token
-    const notificationTitle = "💬 New Message";
-    const notificationBody = `${senderName}: ${message.substring(0, 100)}${message.length > 100 ? "..." : ""}`;
-
-    const notificationData = {
-      type: "new_chat_message",
-      senderEmail: additionalData.senderEmail,
-      senderName: senderName,
-      messageId: additionalData.messageId,
-      timestamp: new Date().toISOString(),
-      screen: "ChatScreen",
-      chatWith: additionalData.senderEmail,
-      ...additionalData,
-    };
-
-    // This will be called with the token already fetched
-    return await sendPushNotification(
-      additionalData.pushToken,
-      notificationTitle,
-      notificationBody,
-      notificationData,
-    );
-  } catch (error) {
-    console.error("Error sending chat notification:", error);
-    return false;
+// ─────────────────────────────────────────────
+// Token management helpers
+// ─────────────────────────────────────────────
+function registerPushToken(token, userId = null) {
+  if (!token) return false;
+  const existing = expoPushTokens.find((t) => t.token === token);
+  if (!existing) {
+    expoPushTokens.push({ token, userId, registeredAt: new Date() });
+    console.log(`✅ Registered push token: ${token.substring(0, 20)}...`);
   }
+  return true;
 }
 
-// Add to module.exports
+function getAllTokens() {
+  return expoPushTokens.map((t) => t.token);
+}
+
 module.exports = {
   sendPushNotification,
   sendBatchNotifications,
   registerPushToken,
   getAllTokens,
   sendServerStartNotification,
+  // Job notifications
   notifyLabourUsersAboutNewJob,
-  sendChatNotification, // Add this
+  notifyContractorAboutApplication,
+  notifyLabourAboutApplicationStatus,
+  // Borrow notifications
+  notifyIndustryAboutBorrowRequest,
+  notifyIndustryAboutBorrowApproval,
+  // Chat
+  sendChatNotification,
+  // Review
+  notifyUserAboutNewReview,
 };
