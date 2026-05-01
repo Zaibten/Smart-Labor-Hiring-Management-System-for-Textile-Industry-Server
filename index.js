@@ -3,6 +3,7 @@ const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const fs = require("fs");
+<<<<<<< HEAD
 const http = require("http");
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
@@ -10,6 +11,11 @@ const ffmpegPath = require("ffmpeg-static");
 const FormData = require("form-data");
 const fetch = require("node-fetch"); // If you get ESM issue, use v2: npm install node-fetch@2
 const OpenAI = require("openai");
+=======
+const path = require("path");
+const FormData = require("form-data");
+const fetch = require("node-fetch"); // use node-fetch@2 for CommonJSconst OpenAI = require("openai");
+>>>>>>> ff8ff26da107142f4e20e4db8d7a1f6e46e6b417
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -413,24 +419,6 @@ const findMatchingQuestion = (text) => {
   return similar;
 };
 
-app.post("/api/chat", async (req, res) => {
-  try {
-    const { message } = req.body;
-    if (!message) return res.status(400).json({ error: "Message is required" });
-
-    // Step 1: Translate user input to Urdu
-    const translation = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "آپ کا کام صرف انگریزی یا کسی بھی زبان کو اردو میں ترجمہ کرنا ہے، بغیر جواب دیے۔",
-        },
-        { role: "user", content: message },
-      ],
-    });
-
     const messageInUrdu = translation.choices[0].message.content.trim();
 
     // Step 2: Find exact or partial match
@@ -473,6 +461,7 @@ app.post("/api/chat", async (req, res) => {
 });
 
 // Transcribe route
+<<<<<<< HEAD
 app.post("/api/transcribe", upload.single("file"), async (req, res) => {
   try {
     if (!req.file || !req.file.path)
@@ -527,6 +516,12 @@ app.post("/api/transcribe", upload.single("file"), async (req, res) => {
     res.status(500).json({ error: "آڈیو کو ٹیکسٹ میں تبدیل کرنے میں ناکامی" });
   }
 });
+=======
+=======
+// SendGrid setup
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+>>>>>>> 1bd22b334aa4fc650399100805656d004a6ee08c
+>>>>>>> ff8ff26da107142f4e20e4db8d7a1f6e46e6b417
 
 /* ---------- Basic middlewares ---------- */
 app.use(helmet());
@@ -541,6 +536,7 @@ const authLimiter = rateLimit({
 });
 app.use("/api/", authLimiter);
 
+<<<<<<< HEAD
 // Create HTTP server
 const server = http.createServer(app);
 
@@ -554,6 +550,8 @@ const io = new Server(server, {
 
 app.use("/api/chat", chatRoutes);
 notification.sendServerStartNotification().catch(console.error);
+=======
+>>>>>>> ff8ff26da107142f4e20e4db8d7a1f6e46e6b417
 
 /* ---------- Mongoose user schema ---------- */
 const userSchema = new mongoose.Schema(
