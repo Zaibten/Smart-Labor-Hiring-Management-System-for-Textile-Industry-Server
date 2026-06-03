@@ -4411,6 +4411,37 @@ app.get("/api/profile/:email", async (req, res) => {
   }
 });
 
+// Add this test endpoint after the email functions
+app.get("/api/test-email", async (req, res) => {
+  try {
+    const testEmail = req.query.email || process.env.test_email;
+
+    const result = await sendSingleEmail(
+      testEmail,
+      "🔔 Labour Hub - SMTP Test Email",
+      `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #0a66c2;">✅ SMTP Test Successful!</h2>
+        <p>If you're reading this, your SMTP email configuration is working perfectly.</p>
+        <p>Time: ${new Date().toLocaleString()}</p>
+        <hr>
+        <p style="color: #666; font-size: 12px;">Labour Hub Notification System</p>
+      </div>
+      `,
+    );
+
+    res.json({
+      success: result,
+      message: result
+        ? "Test email sent successfully"
+        : "Failed to send test email",
+      sentTo: testEmail,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get("/api/jobs/user/:email", async (req, res) => {
   try {
     const { email } = req.params;
