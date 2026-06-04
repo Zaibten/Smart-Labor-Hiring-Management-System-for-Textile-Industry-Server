@@ -1081,42 +1081,48 @@ app.post("/api/signup", async (req, res) => {
   }
 });
 
-// ─── Login ────────────────────────────────────────────────────────────────────
+// ─── Login ───────────────────────────────────
 app.post("/api/login", async (req, res) => {
   try {
-    const { email, password, expoPushToken } = req.body || {};
-    if (!email || !password)
-      return res.status(400).json({ error: "Email and password required." });
+    console.log("Body:", req.body);
+
+    const { email, password, expoPushToken } = req.body;
 
     const user = await User.findOne({
       email: String(email).trim().toLowerCase(),
     });
-    if (!user) return res.status(401).json({ error: "Invalid credentials." });
+
+    console.log("User:", user);
+
+    if (!user)
+      return res.status(401).json({ error: "Invalid credentials." });
+
+    console.log("Hash:", user.passwordHash);
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ error: "Invalid credentials." });
+
+    console.log("Password Match:", ok);
+
+    if (!ok)
+      return res.status(401).json({ error: "Invalid credentials." });
 
     if (expoPushToken) {
       user.expoPushToken = expoPushToken;
       await user.save();
-      console.log(`✅ Saved push token for ${email}`);
     }
 
     const token = signJwt(user);
+
     return res.json({
-      user: {
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-      },
+      user,
       token,
     });
   } catch (err) {
-    console.error("Login error:", err);
-    return res.status(500).json({ error: "Internal server error." });
+    console.error("FULL LOGIN ERROR:", err);
+    return res.status(500).json({
+      error: err.message,
+      stack: err.stack,
+    });
   }
 });
 
@@ -1140,6 +1146,8 @@ app.get("/api/me", async (req, res) => {
     return res.status(401).json({ error: "Invalid or expired token." });
   }
 });
+
+
 
 // ─── Password Reset ───────────────────────────────────────────────────────────
 app.post("/api/forgot-password", async (req, res) => {
