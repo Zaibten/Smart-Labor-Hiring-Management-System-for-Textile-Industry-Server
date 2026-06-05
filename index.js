@@ -45,6 +45,19 @@ app.use(
 
 app.use(express.json({ limit: "10kb" }));
 
+
+
+// At the top of your server file, after app.use(express.json())
+app.use(cors({
+  origin: '*', // Allow all origins for testing
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+}));
+
+// Handle preflight requests
+app.options('*', cors());
+
 // ─── Cloudinary ───────────────────────────────────────────────────────────────
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
