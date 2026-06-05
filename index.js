@@ -1,8 +1,8 @@
 const express = require("express");
+const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const multer = require("multer");
-const fetch = require("node-fetch");
+const path = require("path");
 const OpenAI = require("openai");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
@@ -11,10 +11,8 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const validator = require("validator");
-const sgMail = require("@sendgrid/mail");
+const twilio = require("twilio");
 const nodemailer = require("nodemailer");
-const chatRoutes = require("./chat");
-const notification = require("./notification");
 require("dotenv").config();
 
 const app = express();
@@ -448,55 +446,14 @@ app.post("/api/chat", async (req, res) => {
 });
 
 // ─── Transcribe ──────────────────────────────────────────────────────────────
-app.post("/api/transcribe", upload.single("file"), async (req, res) => {
-  try {
-    if (!req.file || !req.file.path)
-      return res.status(400).json({ error: "کوئی فائل اپلوڈ نہیں ہوئی" });
-
-    const cloudinaryUrl = req.file.path;
-    const audioResponse = await fetch(cloudinaryUrl);
-    const audioBuffer = await audioResponse.buffer();
-
-    const tempInput = path.join("/tmp", `input_${Date.now()}`);
-    const tempOutput = path.join("/tmp", `output_${Date.now()}.mp3`);
-    fs.writeFileSync(tempInput, audioBuffer);
-
-    await new Promise((resolve, reject) => {
-      ffmpeg(tempInput)
-        .setFfmpegPath(ffmpegPath)
-        .output(tempOutput)
-        .on("end", resolve)
-        .on("error", reject)
-        .run();
-    });
-
-    const fileStream = fs.createReadStream(tempOutput);
-    const form = new FormData();
-    form.append("file", fileStream);
-    form.append("model", "whisper-1");
-
-    const whisperResponse = await fetch(
-      "https://api.openai.com/v1/audio/transcriptions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          ...form.getHeaders(),
-        },
-        body: form,
-      },
-    );
-
-    const data = await whisperResponse.json();
-    fs.unlinkSync(tempInput);
-    fs.unlinkSync(tempOutput);
-
-    if (data.error) return res.status(500).json({ error: data.error.message });
-    res.json({ text: data.text || "", cloudinaryUrl });
-  } catch (err) {
-    console.error("Transcription error:", err);
-    res.status(500).json({ error: "آڈیو کو ٹیکسٹ میں تبدیل کرنے میں ناکامی" });
-  }
+// NOTE: /api/transcribe is disabled on Vercel (ffmpeg/ffmpeg-static not supported).
+// To use audio transcription, deploy this route on a separate long-running server
+// (e.g. Railway, Render) and call it from your client directly.
+app.post("/api/transcribe", (req, res) => {
+  res.status(501).json({
+    error:
+      "Audio transcription is not supported in this deployment. Please use a dedicated server for this feature.",
+  });
 });
 
 // ─── Basic middleware ─────────────────────────────────────────────────────────
@@ -511,13 +468,8 @@ const authLimiter = rateLimit({
 });
 app.use("/api/", authLimiter);
 
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
-});
 
-// Replace SendGrid with Nodemailer
-const nodemailer = require("nodemailer");
+
 
 // Configure SMTP transporter
 const transporter = nodemailer.createTransport({
@@ -751,8 +703,6 @@ function getApplicationStatusEmailHTML(job, status, contractorName) {
   `;
 }
 
-app.use("/api/chat", chatRoutes);
-notification.sendServerStartNotification().catch(console.error);
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 const userSchema = new mongoose.Schema(
@@ -1215,7 +1165,8 @@ const client = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN,
 );
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+
 
 app.post("/api/reset-password", async (req, res) => {
   try {
@@ -1243,9 +1194,9 @@ app.post("/api/reset-password", async (req, res) => {
     const logoUrl =
       "https://res.cloudinary.com/dh7kv5dzy/image/upload/v1762834364/logo_je7mnb.png";
     try {
-      await sgMail.send({
+      await transporter.sendMail({
         to: user.email,
-        from: process.env.SENDGRID_VERIFIED_SENDER,
+        from: `"Labour Hub" <${process.env.SMTP_EMAIL}>`,
         subject: "Labour Hub - Password Changed Successfully",
         html: `
           <div style="font-family:'Segoe UI',sans-serif;background:#f5f7fa;padding:40px 0;">
@@ -1344,11 +1295,7 @@ app.post("/api/jobs/apply/:jobId", async (req, res) => {
       ]);
 
       if (contractor?.expoPushToken && labour) {
-        await notification.notifyContractorAboutApplication(
-          contractor.expoPushToken,
-          labour,
-          job,
-        );
+        console.log("[Push skipped] Contractor push notification (not supported on Vercel)");
       }
     } catch (notifErr) {
       console.error("❌ Apply notification error:", notifErr);
@@ -1436,10 +1383,7 @@ app.post("/api/jobs", async (req, res) => {
         // Send push notifications (only to those with tokens)
         const usersWithTokens = labourUsers.filter((u) => u.expoPushToken);
         if (usersWithTokens.length > 0) {
-          notificationResult = await notification.notifyLabourUsersAboutNewJob(
-            usersWithTokens,
-            job,
-          );
+          notificationResult = { successCount: 0, failCount: 0 }; console.log("[Push skipped] Labour push notifications (not supported on Vercel)");
           console.log(
             `📊 Push Notification Summary: ${notificationResult.successCount} sent, ${notificationResult.failCount} failed`,
           );
@@ -1929,11 +1873,7 @@ app.post("/api/apply/:jobId", async (req, res) => {
       ]);
 
       if (contractor?.expoPushToken && labour) {
-        await notification.notifyContractorAboutApplication(
-          contractor.expoPushToken,
-          labour,
-          job,
-        );
+        console.log("[Push skipped] Contractor push notification (not supported on Vercel)");
       }
     } catch (notifErr) {
       console.error("❌ Apply notification error:", notifErr);
@@ -2177,20 +2117,16 @@ app.post("/api/borrow", async (req, res) => {
     try {
       const targetIndustry = await Industry.findOne({ email: toIndustryEmail });
       if (targetIndustry?.expoPushToken) {
-        await notification.notifyIndustryAboutBorrowRequest(
-          targetIndustry.expoPushToken,
-          fromIndustryEmail,
-          borrow,
-        );
+        console.log("[Push skipped] Industry borrow request push (not supported on Vercel)");
       }
     } catch (notifErr) {
       console.error("❌ Borrow push notification error:", notifErr);
     }
 
     // Email
-    const msg = {
+    await transporter.sendMail({
       to: toIndustryEmail,
-      from: process.env.SENDGRID_VERIFIED_SENDER,
+      from: `"Labour Hub" <${process.env.SMTP_EMAIL}>`,
       subject: "Labour Hub - New Labour Borrow Request",
       html: `
       <div style="font-family:'Segoe UI',sans-serif;background:#f5f7fa;padding:40px 0;">
@@ -2218,8 +2154,7 @@ app.post("/api/borrow", async (req, res) => {
           <div style="background:#f3f4f6;padding:18px;text-align:center;font-size:13px;color:#6b7280;">© ${new Date().getFullYear()} Labour Hub · Karachi, Pakistan</div>
         </div>
       </div>`,
-    };
-    await sgMail.send(msg);
+    });
     console.log("✅ Borrow request email sent to", toIndustryEmail);
   } catch (err) {
     console.error("❌ Borrow API error:", err);
@@ -2269,21 +2204,18 @@ app.post("/api/approve-borrow/:id", async (req, res) => {
         email: borrow.fromIndustryEmail,
       });
       if (requesterIndustry?.expoPushToken) {
-        await notification.notifyIndustryAboutBorrowApproval(
-          requesterIndustry.expoPushToken,
-          borrow,
-        );
+        console.log("[Push skipped] Industry borrow approval push (not supported on Vercel)");
       }
     } catch (notifErr) {
       console.error("❌ Borrow approval push error:", notifErr);
     }
 
     // Email
-    if (borrow.fromIndustryEmail && process.env.SENDGRID_VERIFIED_SENDER) {
+    if (borrow.fromIndustryEmail && process.env.SMTP_EMAIL) {
       try {
-        await sgMail.send({
+        await transporter.sendMail({
           to: borrow.fromIndustryEmail,
-          from: process.env.SENDGRID_VERIFIED_SENDER,
+          from: `"Labour Hub" <${process.env.SMTP_EMAIL}>`,
           subject: "Labour Hub - Borrow Request Approved",
           html: `
           <div style="font-family:'Segoe UI',sans-serif;background:#f5f7fa;padding:40px 0;">
@@ -2459,34 +2391,42 @@ ${borrows
   }
 });
 
-// ─── DB connect ───────────────────────────────────────────────────────────────
-async function start() {
-  if (!process.env.MONGO_URI) {
-    console.error("MONGO_URI missing in .env");
-    process.exit(1);
-  }
-  if (!process.env.JWT_SECRET) {
-    console.error("JWT_SECRET missing in .env");
-    process.exit(1);
-  }
+// ─── MongoDB connection (lazy, Vercel-compatible) ─────────────────────────────
+let isConnected = false;
 
-  try {
-    await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log("Connected to MongoDB");
-  } catch (err) {
-    console.error("Failed to connect to MongoDB:", err);
-    process.exit(1);
-  }
+async function connectDB() {
+  if (isConnected) return;
+  if (!process.env.MONGO_URI) throw new Error("MONGO_URI missing in env");
+  if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET missing in env");
+
+  await mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
+  isConnected = true;
+  console.log("✅ Connected to MongoDB");
 }
 
-start();
+// Middleware to ensure DB is connected on every request
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("❌ DB connection error:", err);
+    res.status(500).json({ error: "Database connection failed" });
+  }
+});
 
 app.get("/", (req, res) => res.send("🚀 Labour Hub APIs are running!"));
 
-const port = process.env.PORT || 3000;
-app.listen(port, () =>
-  console.log(`✅ Server running at http://localhost:${port}`),
-);
+// For local development
+if (process.env.NODE_ENV !== "production") {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () =>
+    console.log(`✅ Server running at http://localhost:${port}`),
+  );
+}
+
+// Vercel serverless export
+module.exports = app;
