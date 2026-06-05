@@ -3,7 +3,6 @@ const express = require("express");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const multer = require("multer");
-const fetch = require("node-fetch");
 const OpenAI = require("openai");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
@@ -20,9 +19,30 @@ require("dotenv").config();
 
 const app = express();
 
+// ─── CRITICAL FIX 1: Trust proxy MUST come before rate limiter ───────────────
+// Vercel runs behind a reverse proxy. Without this, express-rate-limit sees
+// ALL requests as coming from the same IP (the proxy), so after 10 requests
+// from ANYONE it blocks EVERYONE with 429 Too Many Requests.
+app.set("trust proxy", 1);
+
 // ─── Basic middleware ─────────────────────────────────────────────────────────
-app.use(helmet());
-app.use(cors());
+// FIX 2: helmet() with relaxed CSP so it doesn't block API responses on Vercel
+app.use(
+  helmet({
+    contentSecurityPolicy: false,   // prevents blocking cross-origin API calls
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// FIX 3: Explicit CORS config — allow all origins (tighten for production)
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 app.use(express.json({ limit: "10kb" }));
 
 // ─── Cloudinary ───────────────────────────────────────────────────────────────
@@ -59,9 +79,13 @@ transporter.verify((error) => {
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
+// FIX: trust proxy is set above, so now each real user IP is tracked correctly.
+// Also raised limit to 60/min to avoid false positives on Vercel cold starts.
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
+  max: 60,                          // raised from 10 → 60 per real IP per minute
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { error: "Too many requests, please slow down." },
 });
 app.use("/api/", authLimiter);
@@ -82,7 +106,6 @@ async function connectDB() {
   return conn;
 }
 
-// Middleware to ensure DB is connected on each request
 app.use(async (req, res, next) => {
   try {
     await connectDB();
@@ -477,7 +500,6 @@ const borrowSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Safe model registration (important for serverless)
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 const Job = mongoose.models.Job || mongoose.model("Job", jobSchema);
 const JobApplication =
@@ -522,10 +544,9 @@ const DEFAULT_IMAGE =
 
 app.get("/", (req, res) => res.send("🚀 Labour Hub APIs are running!"));
 
-// Chat routes
 app.use("/api/chat", chatRoutes);
 
-// ── AI Chat
+// ── AI Chatbot
 app.post("/api/chatbot", async (req, res) => {
   try {
     const { message } = req.body;
@@ -563,13 +584,12 @@ app.post("/api/chatbot", async (req, res) => {
 
     res.json({ reply: response.choices[0].message.content });
   } catch (err) {
-    console.error(err);
+    console.error("Chatbot error:", err);
     res.status(500).json({ error: "سرور میں خرابی پیش آگئی" });
   }
 });
 
-// ── Transcribe (NOTE: ffmpeg removed — not supported on Vercel serverless)
-// If you need transcription, use a different cloud service or offload to a separate server.
+// ── Transcribe (not supported on Vercel serverless)
 app.post("/api/transcribe", upload.single("file"), async (req, res) => {
   return res.status(501).json({
     error:
@@ -1785,67 +1805,47 @@ app.get("/api/admin", async (req, res) => {
 <h2>👤 Users (${users.length})</h2>
 <table>
 <tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Skills</th><th>Push Token</th></tr>
-${users
-  .map(
-    (u) => `<tr>
+${users.map((u) => `<tr>
   <td>${u.firstName} ${u.lastName}</td><td>${u.email}</td><td>${u.phone}</td>
   <td><span class="badge blue">${u.role}</span></td>
   <td>${u.skills?.join(", ") || "-"}</td>
   <td><span class="badge ${u.expoPushToken ? "green" : "gray"}">${u.expoPushToken ? "✅ Yes" : "❌ No"}</span></td>
-</tr>`,
-  )
-  .join("")}
+</tr>`).join("")}
 </table>
 <h2>🛠 Jobs (${jobs.length})</h2>
 <table>
 <tr><th>Title</th><th>Location</th><th>Skill</th><th>Budget</th><th>Workers</th><th>Applicants</th><th>Posted By</th></tr>
-${jobs
-  .map(
-    (j) => `<tr>
+${jobs.map((j) => `<tr>
   <td>${j.title}</td><td>${j.location}</td><td>${j.skill}</td>
   <td>${j.budget}</td><td>${j.workersRequired}</td><td>${j.noOfWorkersApplied || 0}</td>
   <td>${j.createdBy?.email || "-"}</td>
-</tr>`,
-  )
-  .join("")}
+</tr>`).join("")}
 </table>
 <h2>📄 Applications (${applications.length})</h2>
 <table>
 <tr><th>Job ID</th><th>Contractor</th><th>Labour</th><th>Date</th></tr>
-${applications
-  .map(
-    (a) => `<tr>
+${applications.map((a) => `<tr>
   <td>${a.jobId}</td><td>${a.contractorEmail}</td>
   <td>${a.labourEmail}</td><td>${new Date(a.appliedAt).toLocaleString()}</td>
-</tr>`,
-  )
-  .join("")}
+</tr>`).join("")}
 </table>
 <h2>🏭 Industries (${industries.length})</h2>
 <table>
 <tr><th>Industry</th><th>Owner</th><th>Email</th><th>Textile</th><th>Push Token</th><th>Status</th></tr>
-${industries
-  .map(
-    (i) => `<tr>
+${industries.map((i) => `<tr>
   <td>${i.industry}</td><td>${i.owner}</td><td>${i.email}</td><td>${i.textileType}</td>
   <td><span class="badge ${i.expoPushToken ? "green" : "gray"}">${i.expoPushToken ? "✅ Yes" : "❌ No"}</span></td>
   <td><button style="background:${i.active ? "#16a34a" : "#dc2626"}" onclick="toggleIndustry('${i._id}', ${i.active})">${i.active ? "Active" : "Inactive"}</button></td>
-</tr>`,
-  )
-  .join("")}
+</tr>`).join("")}
 </table>
 <h2>🔄 Borrow Requests (${borrows.length})</h2>
 <table>
 <tr><th>From</th><th>To</th><th>Labour</th><th>Skills</th><th>Location</th><th>Status</th></tr>
-${borrows
-  .map(
-    (b) => `<tr>
+${borrows.map((b) => `<tr>
   <td>${b.fromIndustryEmail}</td><td>${b.toIndustryEmail}</td>
   <td>${b.labourRequired}</td><td>${b.skills}</td><td>${b.location}</td>
   <td><span class="badge ${b.status === "Approved" ? "green" : b.status === "Rejected" ? "red" : "gray"}">${b.status}</span></td>
-</tr>`,
-  )
-  .join("")}
+</tr>`).join("")}
 </table>
 <footer style="margin-top:40px;text-align:center;color:#6b7280;font-size:13px;">© ${new Date().getFullYear()} Labour Hub · Admin Panel</footer>
 <script>
