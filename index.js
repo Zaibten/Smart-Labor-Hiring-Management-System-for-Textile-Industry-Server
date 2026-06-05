@@ -1944,5 +1944,96 @@ app.get("/api/test-email", async (req, res) => {
   }
 });
 
+// Add this endpoint to your existing API
+app.post("/api/send-agreement-email", async (req, res) => {
+  try {
+    const { fromEmail, toEmail, fromCompany, toCompany, partyType, description, labourSignature, contractorSignature } = req.body;
+
+    if (!fromEmail || !toEmail) {
+      return res.status(400).json({ error: "Both emails are required" });
+    }
+
+    // Create HTML content for the agreement
+    const agreementHTML = `
+      <div style="font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #fff;">
+        <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #1e3a8a, #0a66c2); color: white; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0;">LABOUR HUB</h1>
+          <p style="margin: 5px 0 0;">Official Labour & Contractor Agreement</p>
+        </div>
+        
+        <div style="padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+          <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <p><strong>From Company:</strong> ${fromCompany}</p>
+            <p><strong>To Company:</strong> ${toCompany}</p>
+            <p><strong>Agreement Type:</strong> ${partyType}</p>
+            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+          </div>
+
+          <h3 style="color: #1e3a8a;">1. Scope of Work</h3>
+          <p>${description}</p>
+
+          <h3 style="color: #1e3a8a;">2. Responsibilities</h3>
+          <p>The service provider shall comply with labour laws, safety policies, and professional conduct requirements.</p>
+
+          <h3 style="color: #1e3a8a;">3. Payment Terms</h3>
+          <p>Payments shall be processed as mutually agreed. Labour Hub holds no responsibility for payment disputes.</p>
+
+          <h3 style="color: #1e3a8a;">4. Confidentiality</h3>
+          <p>All business and operational information shall remain strictly confidential.</p>
+
+          <h3 style="color: #1e3a8a;">5. Termination</h3>
+          <p>Either party may terminate this agreement with written notice upon violation of terms.</p>
+
+          <h3 style="color: #1e3a8a;">6. Governing Law</h3>
+          <p>This agreement shall be governed under the laws of Pakistan.</p>
+
+          <h3 style="color: #1e3a8a;">7. Digital Acceptance</h3>
+          <p>This document is legally binding upon digital confirmation.</p>
+
+          <div style="display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <div style="text-align: center; flex: 1;">
+              <h4>Labour Signature</h4>
+              ${labourSignature ? `<img src="${labourSignature}" style="max-width: 200px; border: 1px solid #ccc; padding: 10px;" />` : '<p style="color: #999;">Not signed</p>'}
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <h4>Contractor Signature</h4>
+              ${contractorSignature ? `<img src="${contractorSignature}" style="max-width: 200px; border: 1px solid #ccc; padding: 10px;" />` : '<p style="color: #999;">Not signed</p>'}
+            </div>
+          </div>
+
+          <div style="margin-top: 40px; padding-top: 20px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb;">
+            <p>Labour Hub - Digital Contract System</p>
+            <p>Email: fyplabourhub@gmail.com | Contact: 0334-112212</p>
+            <p>This is a digitally generated contract. No physical signature required.</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Send email to both parties
+    const emailSubject = `Labour Contract Agreement: ${fromCompany} & ${toCompany}`;
+    
+    const emailPromises = [
+      sendSingleEmail(fromEmail, emailSubject, agreementHTML),
+      sendSingleEmail(toEmail, emailSubject, agreementHTML)
+    ];
+
+    await Promise.all(emailPromises);
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Agreement sent successfully to both parties",
+      sentTo: [fromEmail, toEmail]
+    });
+
+  } catch (error) {
+    console.error("Error sending agreement email:", error);
+    res.status(500).json({ error: "Failed to send agreement email" });
+  }
+});
+
+
+
+
 // ─── Export for Vercel ────────────────────────────────────────────────────────
 module.exports = app;
