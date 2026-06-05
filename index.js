@@ -548,6 +548,7 @@ app.use("/api/chat", chatRoutes);
 
 // ── AI Chatbot
 app.post("/api/chatbot", async (req, res) => {
+   req.setTimeout(30000); // 30 seconds timeout
   try {
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: "Message is required" });
