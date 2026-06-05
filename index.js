@@ -1,8 +1,8 @@
 const express = require("express");
-const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const FormData = require("form-data");
+const multer = require("multer");
+const fetch = require("node-fetch");
 const OpenAI = require("openai");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
@@ -11,12 +11,11 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const validator = require("validator");
-const twilio = require("twilio");
 const sgMail = require("@sendgrid/mail");
+const nodemailer = require("nodemailer");
 const chatRoutes = require("./chat");
-const { Server } = require("socket.io");
-require("dotenv").config();
 const notification = require("./notification");
+require("dotenv").config();
 
 const app = express();
 app.use(express.json());
