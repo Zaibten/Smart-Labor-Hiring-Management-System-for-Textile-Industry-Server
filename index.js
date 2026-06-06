@@ -2033,6 +2033,97 @@ app.post("/api/send-agreement-email", async (req, res) => {
 });
 
 
+// ── Send Agreement Email
+app.post("/api/send-agreement-email", async (req, res) => {
+  try {
+    const {
+      fromCompany,
+      toCompany,
+      partyType,
+      description,
+      fromEmail,
+      toEmail,
+    } = req.body;
+
+    if (!fromEmail || !toEmail) {
+      return res.status(400).json({ error: "Both emails are required" });
+    }
+
+    const date = new Date().toLocaleDateString();
+
+    const agreementHTML = (recipientLabel) => `
+      <div style="font-family:'Segoe UI',sans-serif;background:#f5f7fa;padding:40px 0;">
+        <div style="max-width:700px;background:#fff;margin:0 auto;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+          <div style="background:#1e3a8a;padding:25px 20px;text-align:center;">
+            <h1 style="color:#fff;margin:0;">LABOUR HUB</h1>
+            <p style="color:#bfdbfe;margin-top:6px;">Official Labour & Contractor Agreement</p>
+          </div>
+          <div style="padding:30px 25px;color:#1f2937;">
+            <p>Dear <strong>${recipientLabel}</strong>,<br>Please find below your digitally generated agreement.</p>
+            <div style="background:#f0f4ff;padding:20px;border-radius:8px;margin:20px 0;border:1px solid #c7d2fe;">
+              <p><strong>From Company:</strong> ${fromCompany}</p>
+              <p><strong>To Company:</strong> ${toCompany}</p>
+              <p><strong>Agreement Type:</strong> ${partyType}</p>
+              <p><strong>Date:</strong> ${date}</p>
+            </div>
+            <h3 style="color:#1e3a8a;">1. Scope of Work</h3>
+            <p>${description}</p>
+            <h3 style="color:#1e3a8a;">2. Responsibilities</h3>
+            <p>The service provider shall comply with labour laws, safety policies, and professional conduct requirements.</p>
+            <h3 style="color:#1e3a8a;">3. Payment Terms</h3>
+            <p>Payments shall be processed as mutually agreed. Labour Hub holds no responsibility for payment disputes.</p>
+            <h3 style="color:#1e3a8a;">4. Confidentiality</h3>
+            <p>All business and operational information shall remain strictly confidential.</p>
+            <h3 style="color:#1e3a8a;">5. Termination</h3>
+            <p>Either party may terminate this agreement with written notice upon violation of terms.</p>
+            <h3 style="color:#1e3a8a;">6. Governing Law</h3>
+            <p>This agreement shall be governed under the laws of Pakistan.</p>
+            <h3 style="color:#1e3a8a;">7. Digital Acceptance</h3>
+            <p>This document is legally binding upon digital confirmation.</p>
+            <div style="margin-top:30px;padding-top:20px;border-top:1px solid #e5e7eb;">
+              <p><strong>Labour Hub</strong><br>Email: fyplabourhub@gmail.com<br>Contact: 0334-112212<br>Date: ${date}<br>Digitally Generated Contract</p>
+            </div>
+          </div>
+          <div style="background:#f0f2f5;text-align:center;padding:20px;">
+            <p style="color:#777;font-size:13px;margin:0;">© ${new Date().getFullYear()} Labour Hub · Pakistan</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const [result1, result2] = await Promise.all([
+      sendSingleEmail(
+        fromEmail,
+        `Labour Hub – Agreement with ${toCompany}`,
+        agreementHTML(fromCompany),
+      ),
+      sendSingleEmail(
+        toEmail,
+        `Labour Hub – Agreement with ${fromCompany}`,
+        agreementHTML(toCompany),
+      ),
+    ]);
+
+    if (result1 && result2) {
+      return res
+        .status(200)
+        .json({
+          success: true,
+          message: "Agreement emails sent to both parties.",
+        });
+    } else {
+      return res
+        .status(500)
+        .json({
+          success: false,
+          message: "One or both emails failed to send.",
+        });
+    }
+  } catch (err) {
+    console.error("Agreement email error:", err);
+    res.status(500).json({ error: "Server error sending agreement emails." });
+  }
+});
 
 
 // ─── Export for Vercel ────────────────────────────────────────────────────────
