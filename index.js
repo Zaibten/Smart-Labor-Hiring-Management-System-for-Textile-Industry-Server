@@ -1776,19 +1776,6 @@ app.post("/api/approve-borrow/:id", async (req, res) => {
   }
 });
 
-// ── Admin Panel
-app.post("/api/admin/industry-toggle/:id", async (req, res) => {
-  try {
-    const industry = await Industry.findById(req.params.id);
-    if (!industry) return res.status(404).json({ error: "Industry not found" });
-    industry.active = !industry.active;
-    await industry.save();
-    res.json({ success: true, active: industry.active });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
 app.get("/api/admin", async (req, res) => {
   try {
     const users = await User.find().lean();
@@ -1797,84 +1784,601 @@ app.get("/api/admin", async (req, res) => {
     const industries = await Industry.find().lean();
     const borrows = await Borrow.find().lean();
 
-    const html = `<!DOCTYPE html>
-<html>
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <title>Labour Hub | Admin Panel</title>
-  <meta charset="UTF-8"/>
-  <style>
-    body{font-family:"Segoe UI",sans-serif;background:#f4f6f9;padding:20px;}
-    h1{color:#0a66c2;} h2{margin-top:40px;color:#111827;border-left:6px solid #0a66c2;padding-left:10px;}
-    table{width:100%;border-collapse:collapse;margin-top:15px;background:#fff;box-shadow:0 6px 18px rgba(0,0,0,.06);border-radius:10px;overflow:hidden;}
-    th,td{padding:10px;border-bottom:1px solid #e5e7eb;font-size:14px;text-align:left;}
-    th{background:#0a66c2;color:#fff;font-weight:600;}
-    tr:nth-child(even){background:#f9fafb;} tr:hover{background:#eef2ff;}
-    .badge{padding:4px 8px;border-radius:6px;font-size:12px;color:white;}
-    .green{background:#16a34a;} .red{background:#dc2626;} .blue{background:#2563eb;} .gray{background:#6b7280;}
-    button{border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;color:#fff;}
-  </style>
+<title>Labour Hub | Admin Panel</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<style>
+  :root {
+    --primary: #0a66c2;
+    --primary-dark: #004182;
+    --primary-light: #e8f1fc;
+    --bg: #f4f6fb;
+    --card-bg: #ffffff;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --green: #16a34a;
+    --red: #dc2626;
+    --gray: #6b7280;
+    --radius: 14px;
+    --shadow: 0 8px 24px rgba(10, 102, 194, 0.08);
+    --shadow-hover: 0 12px 32px rgba(10, 102, 194, 0.16);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: "Segoe UI", "Inter", system-ui, sans-serif;
+    background: linear-gradient(180deg, #eef3fb 0%, #f4f6fb 100%);
+    margin: 0;
+    padding: 28px;
+    color: var(--text);
+    animation: fadeInPage 0.5s ease;
+  }
+
+  @keyframes fadeInPage {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes rowIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(10,102,194,0.25); }
+    50% { box-shadow: 0 0 0 6px rgba(10,102,194,0); }
+  }
+
+  /* ─── Header ─── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    padding: 28px 32px;
+    border-radius: var(--radius);
+    color: #fff;
+    box-shadow: var(--shadow);
+    animation: slideUp 0.5s ease;
+    margin-bottom: 26px;
+  }
+  .header h1 {
+    margin: 0;
+    font-size: 26px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .header p {
+    margin: 4px 0 0;
+    color: #dbeafe;
+    font-size: 14px;
+  }
+  .header .live-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #4ade80;
+    display: inline-block;
+    animation: pulseGlow 1.8s infinite;
+  }
+  .header .timestamp {
+    font-size: 13px;
+    color: #dbeafe;
+    text-align: right;
+  }
+
+  /* ─── Stats ─── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 30px;
+  }
+  .stat-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    animation: slideUp 0.5s ease backwards;
+    border: 1px solid var(--border);
+  }
+  .stat-card:nth-child(1) { animation-delay: 0.05s; }
+  .stat-card:nth-child(2) { animation-delay: 0.1s; }
+  .stat-card:nth-child(3) { animation-delay: 0.15s; }
+  .stat-card:nth-child(4) { animation-delay: 0.2s; }
+  .stat-card:nth-child(5) { animation-delay: 0.25s; }
+  .stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+  }
+  .stat-card .label {
+    font-size: 13px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+  .stat-card .value {
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  /* ─── Section / Card ─── */
+  .section {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 30px;
+    overflow: hidden;
+    animation: slideUp 0.55s ease backwards;
+    border: 1px solid var(--border);
+  }
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    background: var(--primary-light);
+  }
+  .section-header h2 {
+    margin: 0;
+    font-size: 17px;
+    color: var(--primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .count-badge {
+    background: var(--primary);
+    color: #fff;
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+
+  .search-box {
+    position: relative;
+  }
+  .search-box input {
+    padding: 8px 14px 8px 34px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    width: 220px;
+    outline: none;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, width 0.2s ease;
+    background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="%236b7280" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.398 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>') no-repeat 12px center;
+  }
+  .search-box input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(10,102,194,0.15);
+    width: 260px;
+  }
+
+  /* ─── Table scroll wrapper ─── */
+  .table-scroll {
+    max-height: 420px;
+    overflow-y: auto;
+    overflow-x: auto;
+  }
+  .table-scroll::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .table-scroll::-webkit-scrollbar-track {
+    background: #f1f4f9;
+  }
+  .table-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+    border-radius: 10px;
+    border: 2px solid #f1f4f9;
+  }
+  .table-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-dark);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 640px;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    font-size: 13px;
+    text-align: left;
+    padding: 12px 14px;
+    z-index: 2;
+  }
+  tbody td {
+    padding: 11px 14px;
+    font-size: 13.5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody tr {
+    animation: rowIn 0.3s ease backwards;
+    transition: background 0.15s ease;
+  }
+  tbody tr:nth-child(even) { background: #fafbfe; }
+  tbody tr:hover { background: var(--primary-light); }
+  tbody tr.hidden-row { display: none; }
+
+  .badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #fff;
+    display: inline-block;
+  }
+  .green { background: var(--green); }
+  .red { background: var(--red); }
+  .blue { background: #2563eb; }
+  .gray { background: var(--gray); }
+
+  .toggle-btn {
+    border: none;
+    padding: 6px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+  .toggle-btn.green { background: var(--green); }
+  .toggle-btn.red { background: var(--red); }
+  .toggle-btn:hover { transform: scale(1.05); opacity: 0.92; }
+
+  /* ─── Pagination ─── */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 14px;
+    flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+    background: #fbfcfe;
+  }
+  .pagination button {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .pagination button:hover:not(:disabled) {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .pagination button.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    font-weight: 700;
+  }
+  .pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .empty-state {
+    padding: 30px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  footer {
+    margin-top: 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    animation: fadeInPage 0.6s ease;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 14px; }
+    .header { padding: 20px; }
+    .search-box input { width: 150px; }
+    .search-box input:focus { width: 180px; }
+  }
+</style>
 </head>
 <body>
-<h1>📊 Labour Hub – Admin Panel</h1>
-<h2>👤 Users (${users.length})</h2>
-<table>
-<tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Skills</th><th>Push Token</th></tr>
-${users.map((u) => `<tr>
-  <td>${u.firstName} ${u.lastName}</td><td>${u.email}</td><td>${u.phone}</td>
-  <td><span class="badge blue">${u.role}</span></td>
-  <td>${u.skills?.join(", ") || "-"}</td>
-  <td><span class="badge ${u.expoPushToken ? "green" : "gray"}">${u.expoPushToken ? "✅ Yes" : "❌ No"}</span></td>
-</tr>`).join("")}
-</table>
-<h2>🛠 Jobs (${jobs.length})</h2>
-<table>
-<tr><th>Title</th><th>Location</th><th>Skill</th><th>Budget</th><th>Workers</th><th>Applicants</th><th>Posted By</th></tr>
-${jobs.map((j) => `<tr>
-  <td>${j.title}</td><td>${j.location}</td><td>${j.skill}</td>
-  <td>${j.budget}</td><td>${j.workersRequired}</td><td>${j.noOfWorkersApplied || 0}</td>
-  <td>${j.createdBy?.email || "-"}</td>
-</tr>`).join("")}
-</table>
-<h2>📄 Applications (${applications.length})</h2>
-<table>
-<tr><th>Job ID</th><th>Contractor</th><th>Labour</th><th>Date</th></tr>
-${applications.map((a) => `<tr>
-  <td>${a.jobId}</td><td>${a.contractorEmail}</td>
-  <td>${a.labourEmail}</td><td>${new Date(a.appliedAt).toLocaleString()}</td>
-</tr>`).join("")}
-</table>
-<h2>🏭 Industries (${industries.length})</h2>
-<table>
-<tr><th>Industry</th><th>Owner</th><th>Email</th><th>Textile</th><th>Push Token</th><th>Status</th></tr>
-${industries.map((i) => `<tr>
-  <td>${i.industry}</td><td>${i.owner}</td><td>${i.email}</td><td>${i.textileType}</td>
-  <td><span class="badge ${i.expoPushToken ? "green" : "gray"}">${i.expoPushToken ? "✅ Yes" : "❌ No"}</span></td>
-  <td><button style="background:${i.active ? "#16a34a" : "#dc2626"}" onclick="toggleIndustry('${i._id}', ${i.active})">${i.active ? "Active" : "Inactive"}</button></td>
-</tr>`).join("")}
-</table>
-<h2>🔄 Borrow Requests (${borrows.length})</h2>
-<table>
-<tr><th>From</th><th>To</th><th>Labour</th><th>Skills</th><th>Location</th><th>Status</th></tr>
-${borrows.map((b) => `<tr>
-  <td>${b.fromIndustryEmail}</td><td>${b.toIndustryEmail}</td>
-  <td>${b.labourRequired}</td><td>${b.skills}</td><td>${b.location}</td>
-  <td><span class="badge ${b.status === "Approved" ? "green" : b.status === "Rejected" ? "red" : "gray"}">${b.status}</span></td>
-</tr>`).join("")}
-</table>
-<footer style="margin-top:40px;text-align:center;color:#6b7280;font-size:13px;">© ${new Date().getFullYear()} Labour Hub · Admin Panel</footer>
+
+<div class="header">
+  <div>
+    <h1><span class="live-dot"></span>&nbsp;Labour Hub Admin Panel</h1>
+    <p>Real-time overview of users, jobs, industries & requests</p>
+  </div>
+  <div class="timestamp">Loaded: ${new Date().toLocaleString()}</div>
+</div>
+
+<div class="stats">
+  <div class="stat-card"><div class="label">Total Users</div><div class="value">${users.length}</div></div>
+  <div class="stat-card"><div class="label">Total Jobs</div><div class="value">${jobs.length}</div></div>
+  <div class="stat-card"><div class="label">Applications</div><div class="value">${applications.length}</div></div>
+  <div class="stat-card"><div class="label">Industries</div><div class="value">${industries.length}</div></div>
+  <div class="stat-card"><div class="label">Borrow Requests</div><div class="value">${borrows.length}</div></div>
+</div>
+
+<!-- USERS -->
+<div class="section" data-section="users">
+  <div class="section-header">
+    <h2>👤 Users <span class="count-badge">${users.length}</span></h2>
+    <div class="search-box"><input type="text" placeholder="Search users..." class="search-input"/></div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Skills</th><th>Push Token</th><th>Created</th></tr>
+      </thead>
+      <tbody>
+        ${users
+          .map(
+            (u, i) => `
+        <tr style="animation-delay:${Math.min(i * 0.02, 0.4)}s" data-search="${(u.firstName + " " + u.lastName + " " + u.email + " " + u.phone + " " + u.role + " " + (u.skills || []).join(" ")).toLowerCase()}">
+          <td>${u.firstName} ${u.lastName}</td>
+          <td>${u.email}</td>
+          <td>${u.phone}</td>
+          <td><span class="badge blue">${u.role}</span></td>
+          <td>${u.skills?.join(", ") || "-"}</td>
+          <td><span class="badge ${u.expoPushToken ? "green" : "gray"}">${u.expoPushToken ? "✅ Yes" : "❌ No"}</span></td>
+          <td>${new Date(u.createdAt).toLocaleString()}</td>
+        </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination"></div>
+</div>
+
+<!-- JOBS -->
+<div class="section" data-section="jobs">
+  <div class="section-header">
+    <h2>🛠 Jobs <span class="count-badge">${jobs.length}</span></h2>
+    <div class="search-box"><input type="text" placeholder="Search jobs..." class="search-input"/></div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Title</th><th>Location</th><th>Skill</th><th>Budget</th><th>Workers</th><th>Applicants</th><th>Posted By</th></tr>
+      </thead>
+      <tbody>
+        ${jobs
+          .map(
+            (j, i) => `
+        <tr style="animation-delay:${Math.min(i * 0.02, 0.4)}s" data-search="${(j.title + " " + j.location + " " + j.skill + " " + (j.createdBy?.email || "")).toLowerCase()}">
+          <td>${j.title}</td>
+          <td>${j.location}</td>
+          <td>${j.skill}</td>
+          <td>${j.budget}</td>
+          <td>${j.workersRequired}</td>
+          <td>${j.noOfWorkersApplied || 0}</td>
+          <td>${j.createdBy?.email || "-"}</td>
+        </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination"></div>
+</div>
+
+<!-- APPLICATIONS -->
+<div class="section" data-section="applications">
+  <div class="section-header">
+    <h2>📄 Job Applications <span class="count-badge">${applications.length}</span></h2>
+    <div class="search-box"><input type="text" placeholder="Search applications..." class="search-input"/></div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Job ID</th><th>Contractor</th><th>Labour</th><th>Date</th></tr>
+      </thead>
+      <tbody>
+        ${applications
+          .map(
+            (a, i) => `
+        <tr style="animation-delay:${Math.min(i * 0.02, 0.4)}s" data-search="${(a.jobId + " " + a.contractorEmail + " " + a.labourEmail).toLowerCase()}">
+          <td>${a.jobId}</td>
+          <td>${a.contractorEmail}</td>
+          <td>${a.labourEmail}</td>
+          <td>${new Date(a.appliedAt).toLocaleString()}</td>
+        </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination"></div>
+</div>
+
+<!-- INDUSTRIES -->
+<div class="section" data-section="industries">
+  <div class="section-header">
+    <h2>🏭 Industries <span class="count-badge">${industries.length}</span></h2>
+    <div class="search-box"><input type="text" placeholder="Search industries..." class="search-input"/></div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Industry</th><th>Owner</th><th>Email</th><th>Phone</th><th>Textile</th><th>Push Token</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        ${industries
+          .map(
+            (ind, i) => `
+        <tr style="animation-delay:${Math.min(i * 0.02, 0.4)}s" data-search="${(ind.industry + " " + ind.owner + " " + ind.email + " " + ind.textileType).toLowerCase()}">
+          <td>${ind.industry}</td>
+          <td>${ind.owner}</td>
+          <td>${ind.email}</td>
+          <td>${ind.phone}</td>
+          <td>${ind.textileType}</td>
+          <td><span class="badge ${ind.expoPushToken ? "green" : "gray"}">${ind.expoPushToken ? "✅ Yes" : "❌ No"}</span></td>
+          <td>
+            <form method="POST" action="/api/admin/industry-toggle/${ind._id}" onsubmit="return confirm('${ind.active ? "Deactivate" : "Activate"} this industry?');" style="display:inline;">
+              <button type="submit" class="toggle-btn ${ind.active ? "green" : "red"}">${ind.active ? "Active" : "Inactive"}</button>
+            </form>
+          </td>
+        </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination"></div>
+</div>
+
+<!-- BORROWS -->
+<div class="section" data-section="borrows">
+  <div class="section-header">
+    <h2>🔄 Borrow Requests <span class="count-badge">${borrows.length}</span></h2>
+    <div class="search-box"><input type="text" placeholder="Search borrow requests..." class="search-input"/></div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>From</th><th>To</th><th>Labour</th><th>Skills</th><th>Location</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        ${borrows
+          .map(
+            (b, i) => `
+        <tr style="animation-delay:${Math.min(i * 0.02, 0.4)}s" data-search="${(b.fromIndustryEmail + " " + b.toIndustryEmail + " " + b.skills + " " + b.location).toLowerCase()}">
+          <td>${b.fromIndustryEmail}</td>
+          <td>${b.toIndustryEmail}</td>
+          <td>${b.labourRequired}</td>
+          <td>${b.skills}</td>
+          <td>${b.location}</td>
+          <td><span class="badge ${b.status === "Approved" ? "green" : b.status === "Rejected" ? "red" : "gray"}">${b.status}</span></td>
+        </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination"></div>
+</div>
+
+<footer>© ${new Date().getFullYear()} Labour Hub · Admin Panel</footer>
+
 <script>
-function toggleIndustry(id, currentStatus) {
-  if (!confirm((currentStatus ? "Deactivate" : "Activate") + " this industry?")) return;
-  fetch("/api/admin/industry-toggle/" + id, { method: "POST" })
-    .then(r => r.json()).then(() => location.reload())
-    .catch(err => alert("Failed: " + err.message));
-}
+  // ─── Search + Pagination per section ───
+  const ROWS_PER_PAGE = 8;
+
+  document.querySelectorAll('.section').forEach(section => {
+    const tbody = section.querySelector('tbody');
+    const allRows = Array.from(tbody.querySelectorAll('tr'));
+    const paginationEl = section.querySelector('.pagination');
+    const searchInput = section.querySelector('.search-input');
+    let filteredRows = allRows;
+    let currentPage = 1;
+
+    function renderPage() {
+      const totalPages = Math.max(1, Math.ceil(filteredRows.length / ROWS_PER_PAGE));
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      allRows.forEach(r => r.classList.add('hidden-row'));
+
+      const start = (currentPage - 1) * ROWS_PER_PAGE;
+      const pageRows = filteredRows.slice(start, start + ROWS_PER_PAGE);
+      pageRows.forEach(r => r.classList.remove('hidden-row'));
+
+      // empty state
+      let emptyEl = tbody.querySelector('.empty-row');
+      if (filteredRows.length === 0) {
+        if (!emptyEl) {
+          const colCount = section.querySelectorAll('thead th').length;
+          const tr = document.createElement('tr');
+          tr.className = 'empty-row';
+          tr.innerHTML = '<td colspan="' + colCount + '" class="empty-state">No matching records found</td>';
+          tbody.appendChild(tr);
+        }
+      } else if (emptyEl) {
+        emptyEl.remove();
+      }
+
+      // build pagination controls
+      paginationEl.innerHTML = '';
+      if (totalPages <= 1) return;
+
+      const prevBtn = document.createElement('button');
+      prevBtn.textContent = '‹ Prev';
+      prevBtn.disabled = currentPage === 1;
+      prevBtn.onclick = () => { currentPage--; renderPage(); };
+      paginationEl.appendChild(prevBtn);
+
+      const maxButtons = 5;
+      let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+      let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+      startPage = Math.max(1, endPage - maxButtons + 1);
+
+      for (let p = startPage; p <= endPage; p++) {
+        const btn = document.createElement('button');
+        btn.textContent = p;
+        if (p === currentPage) btn.classList.add('active');
+        btn.onclick = () => { currentPage = p; renderPage(); };
+        paginationEl.appendChild(btn);
+      }
+
+      const nextBtn = document.createElement('button');
+      nextBtn.textContent = 'Next ›';
+      nextBtn.disabled = currentPage === totalPages;
+      nextBtn.onclick = () => { currentPage++; renderPage(); };
+      paginationEl.appendChild(nextBtn);
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        const q = searchInput.value.trim().toLowerCase();
+        filteredRows = allRows.filter(r => (r.dataset.search || '').includes(q));
+        currentPage = 1;
+        renderPage();
+      });
+    }
+
+    renderPage();
+  });
 </script>
+
 </body>
 </html>`;
 
     res.send(html);
   } catch (err) {
+    console.error(err);
     res.status(500).send("Server Error");
   }
 });
