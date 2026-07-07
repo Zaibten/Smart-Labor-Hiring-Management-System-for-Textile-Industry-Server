@@ -2627,6 +2627,27 @@ app.post("/api/send-agreement-email", async (req, res) => {
     console.error("Agreement email error:", err);
     res.status(500).json({ error: "Server error sending agreement emails." });
   }
+  
+});
+
+
+
+
+// ── Toggle Industry Active/Inactive (used by admin panel)
+app.post("/api/admin/industry-toggle/:id", async (req, res) => {
+  try {
+    const industry = await Industry.findById(req.params.id);
+    if (!industry) return res.status(404).send("Industry not found");
+
+    industry.active = !industry.active;
+    await industry.save();
+
+    // Redirect back to the admin panel so the page refreshes with updated status
+    res.redirect("/api/admin");
+  } catch (err) {
+    console.error("Industry toggle error:", err);
+    res.status(500).send("Server error toggling industry status");
+  }
 });
 
 
